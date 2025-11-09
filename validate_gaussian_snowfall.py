@@ -250,6 +250,9 @@ def evaluate_cycles_gaussian(
         # calculate benefit
         benefit = cost_without_plow - cost_with_plow
         benefit_per_minute = benefit / storm_duration if storm_duration > 0 else 0.0
+        benefit_pct = (
+            (benefit / cost_without_plow * 100.0) if cost_without_plow > 0 else 0.0
+        )
 
         # calculate cycle time
         cycle_time = sum(G[u][v][k]["travel_time"] for u, v, k in cycle)
@@ -261,6 +264,7 @@ def evaluate_cycles_gaussian(
             "cost_with_plow": float(cost_with_plow),
             "benefit": float(benefit),
             "benefit_per_minute": float(benefit_per_minute),
+            "benefit_pct": float(benefit_pct),
             "cycle_time": float(cycle_time),
             "num_complete_cycles": int(num_complete_cycles),
             "coverage_ratio": float(
@@ -287,16 +291,14 @@ def compare_uniform_vs_gaussian(uniform_results, gaussian_results):
     comparison_rows = []
 
     for uniform, gaussian in zip(uniform_results, gaussian_results):
-        uniform_benefit = uniform.get("evaluation", {}).get("benefit_per_minute", 0.0)
-        gaussian_benefit = gaussian.get("gaussian_evaluation", {}).get(
-            "benefit_per_minute", 0.0
+        # use benefit_pct (efficiency) instead of benefit_per_minute
+        uniform_benefit_pct = uniform.get("evaluation", {}).get("benefit_pct", 0.0)
+        gaussian_benefit_pct = gaussian.get("gaussian_evaluation", {}).get(
+            "benefit_pct", 0.0
         )
 
-        change_pct = (
-            ((gaussian_benefit - uniform_benefit) / uniform_benefit) * 100
-            if uniform_benefit > 0
-            else 0.0
-        )
+        # change is difference in percentage points (not percent of percent)
+        change_pct = gaussian_benefit_pct - uniform_benefit_pct
 
         comparison_rows.append(
             {
@@ -304,8 +306,8 @@ def compare_uniform_vs_gaussian(uniform_results, gaussian_results):
                 "partition_id": uniform["partition_id"],
                 "method": uniform["method"],
                 "start_node": uniform["start_node"],
-                "uniform_benefit": uniform_benefit,
-                "gaussian_benefit": gaussian_benefit,
+                "uniform_benefit_pct": uniform_benefit_pct,
+                "gaussian_benefit_pct": gaussian_benefit_pct,
                 "change_pct": change_pct,
             }
         )
@@ -318,39 +320,31 @@ def compare_uniform_vs_gaussian(uniform_results, gaussian_results):
     print("=" * 60)
 
     # overall statistics
-    print(f"\naverage benefit change: {comparison_df['change_pct'].mean():.2f}%")
-    print(f"std dev of change: {comparison_df['change_pct'].std():.2f}%")
+    print(
+        f"\naverage efficiency change: {comparison_df['change_pct'].mean():+.2f} percentage points"
+    )
+    print(
+        f"std dev of change: {comparison_df['change_pct'].std():.2f} percentage points"
+    )
 
     # partition-level analysis
     print("\npartition-level summary:")
     print("-" * 60)
     partition_summary = comparison_df.groupby(["partition_set_id", "partition_id"]).agg(
         {
-            "uniform_benefit": "mean",
-            "gaussian_benefit": "mean",
+            "uniform_benefit_pct": "mean",
+            "gaussian_benefit_pct": "mean",
             "change_pct": "mean",
         }
-    )
-    partition_summary["change_pct"] = partition_summary.apply(
-        lambda row: (
-            (
-                (row["gaussian_benefit"] - row["uniform_benefit"])
-                / row["uniform_benefit"]
-            )
-            * 100
-            if row["uniform_benefit"] > 0
-            else 0.0
-        ),
-        axis=1,
     )
 
     for idx, row in partition_summary.iterrows():
         ps_id, p_id = idx
         print(
             f"partition set {ps_id}, partition {p_id}: "
-            f"uniform={row['uniform_benefit']:.1f}, "
-            f"gaussian={row['gaussian_benefit']:.1f} "
-            f"({row['change_pct']:+.1f}%)"
+            f"uniform={row['uniform_benefit_pct']:.1f}%, "
+            f"gaussian={row['gaussian_benefit_pct']:.1f}% "
+            f"({row['change_pct']:+.1f} pp)"
         )
 
     # top affected cycles
@@ -360,7 +354,8 @@ def compare_uniform_vs_gaussian(uniform_results, gaussian_results):
     for idx, row in worst_cycles.iterrows():
         print(
             f"ps={row['partition_set_id']}, p={row['partition_id']}, "
-            f"method={row['method']}: {row['change_pct']:+.1f}%"
+            f"method={row['method']}: {row['change_pct']:+.1f} pp "
+            f"(uniform={row['uniform_benefit_pct']:.1f}%, gaussian={row['gaussian_benefit_pct']:.1f}%)"
         )
 
     print("\ntop 10 cycles most positively affected:")
@@ -369,7 +364,8 @@ def compare_uniform_vs_gaussian(uniform_results, gaussian_results):
     for idx, row in best_cycles.iterrows():
         print(
             f"ps={row['partition_set_id']}, p={row['partition_id']}, "
-            f"method={row['method']}: {row['change_pct']:+.1f}%"
+            f"method={row['method']}: {row['change_pct']:+.1f} pp "
+            f"(uniform={row['uniform_benefit_pct']:.1f}%, gaussian={row['gaussian_benefit_pct']:.1f}%)"
         )
 
     return comparison_df

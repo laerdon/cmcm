@@ -170,8 +170,13 @@ def calculate_cycle_benefit(G, cycle, snowfall_rate, storm_duration):
     # calculate cycle time (single pass)
     cycle_time = sum(G[u][v][k]["travel_time"] for u, v, k in cycle)
 
-    # benefit per minute of storm duration
+    # benefit per minute of storm duration (legacy metric)
     benefit_per_minute = benefit / storm_duration if storm_duration > 0 else 0.0
+
+    # benefit as percentage of baseline cost (efficiency metric)
+    benefit_pct = (
+        (benefit / cost_without_plow * 100.0) if cost_without_plow > 0 else 0.0
+    )
 
     # coverage ratio: what fraction of partition edges are covered
     # (this will be filled in later if we have partition context)
@@ -182,6 +187,7 @@ def calculate_cycle_benefit(G, cycle, snowfall_rate, storm_duration):
         "cost_with_plow": float(cost_with_plow),
         "benefit": float(benefit),
         "benefit_per_minute": float(benefit_per_minute),
+        "benefit_pct": float(benefit_pct),
         "cycle_time": float(cycle_time),
         "num_complete_cycles": int(num_complete_cycles),
         "coverage_ratio": float(coverage_ratio),
@@ -225,7 +231,7 @@ def evaluate_all_cycles(G, cycles, snowfall_rate, storm_duration):
 
 def rank_cycles_by_partition(evaluated_cycles):
     """
-    rank cycles within each partition by benefit per minute.
+    rank cycles within each partition by benefit percentage (efficiency).
 
     args:
         evaluated_cycles: list of evaluated cycle dicts
@@ -241,10 +247,13 @@ def rank_cycles_by_partition(evaluated_cycles):
             partitions[key] = []
         partitions[key].append(cycle_data)
 
-    # rank within each partition
+    # rank within each partition by benefit_pct (efficiency)
     for key in partitions:
         partitions[key].sort(
-            key=lambda x: x["evaluation"]["benefit_per_minute"], reverse=True
+            key=lambda x: x["evaluation"].get(
+                "benefit_pct", x["evaluation"].get("benefit_per_minute", 0)
+            ),
+            reverse=True,
         )
 
     return partitions
@@ -298,6 +307,7 @@ def main():
                 "num_complete_cycles": cycle_data["evaluation"]["num_complete_cycles"],
                 "benefit": cycle_data["evaluation"]["benefit"],
                 "benefit_per_minute": cycle_data["evaluation"]["benefit_per_minute"],
+                "benefit_pct": cycle_data["evaluation"]["benefit_pct"],
                 "cost_without_plow": cycle_data["evaluation"]["cost_without_plow"],
                 "cost_with_plow": cycle_data["evaluation"]["cost_with_plow"],
                 "coverage_ratio": cycle_data["evaluation"]["coverage_ratio"],
@@ -307,15 +317,15 @@ def main():
         )
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_df = summary_df.sort_values("benefit_per_minute", ascending=False)
+    summary_df = summary_df.sort_values("benefit_pct", ascending=False)
     summary_df.to_csv("cycle_evaluations.csv", index=False)
     print(f"[INFO] saved cycle evaluations to cycle_evaluations.csv")
 
     # print summary statistics
     print("\n[SUMMARY] evaluation statistics:")
     print(f"average benefit: {summary_df['benefit'].mean():.2f}")
-    print(f"average benefit per minute: {summary_df['benefit_per_minute'].mean():.4f}")
-    print(f"best benefit per minute: {summary_df['benefit_per_minute'].max():.4f}")
+    print(f"average benefit %: {summary_df['benefit_pct'].mean():.2f}%")
+    print(f"best benefit %: {summary_df['benefit_pct'].max():.2f}%")
     print(
         f"average cycles completed in {STORM_DURATION_HOURS}h: {summary_df['num_complete_cycles'].mean():.1f}"
     )
@@ -328,7 +338,7 @@ def main():
         top_cycle = ranked_partitions[key][0]
         print(
             f"  partition set {ps_id}, partition {p_id}: "
-            f"benefit/min = {top_cycle['evaluation']['benefit_per_minute']:.4f}, "
+            f"benefit = {top_cycle['evaluation']['benefit_pct']:.2f}%, "
             f"cycles completed = {top_cycle['evaluation']['num_complete_cycles']}, "
             f"coverage = {top_cycle['evaluation']['coverage_ratio']:.1%}, "
             f"method = {top_cycle['method']}"

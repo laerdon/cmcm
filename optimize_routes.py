@@ -326,9 +326,11 @@ def optimize_cycle(
         G, cycle, snowfall_rate, storm_duration
     )
     best_cycle = cycle
-    best_benefit = current_benefit_metrics["benefit_per_minute"]
+    best_benefit = current_benefit_metrics.get(
+        "benefit_pct", current_benefit_metrics["benefit_per_minute"]
+    )
 
-    print(f"    [DEBUG] initial benefit: {best_benefit:.4f}")
+    print(f"    [DEBUG] initial benefit: {best_benefit:.2f}%")
 
     # use 2-opt optimization
     for iteration in range(max_iterations):
@@ -340,12 +342,14 @@ def optimize_cycle(
                 new_benefit_metrics = calculate_cycle_benefit(
                     G, new_cycle, snowfall_rate, storm_duration
                 )
-                new_benefit = new_benefit_metrics["benefit_per_minute"]
+                new_benefit = new_benefit_metrics.get(
+                    "benefit_pct", new_benefit_metrics["benefit_per_minute"]
+                )
 
                 # accept if improvement
                 if new_benefit > best_benefit * 1.001:  # 0.1% threshold
                     print(
-                        f"    [DEBUG] iteration {iteration}: {best_benefit:.4f} -> {new_benefit:.4f}"
+                        f"    [DEBUG] iteration {iteration}: {best_benefit:.2f}% -> {new_benefit:.2f}%"
                     )
                     best_cycle = new_cycle
                     best_benefit = new_benefit
@@ -361,7 +365,7 @@ def optimize_cycle(
             # operator failed, stop
             break
 
-    print(f"    [DEBUG] final benefit: {best_benefit:.4f}")
+    print(f"    [DEBUG] final benefit: {best_benefit:.2f}%")
     return best_cycle
 
 
