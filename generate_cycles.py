@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
 generate candidate plow cycles for each partition using smart sampling.
-methods: greedy construction, priority-biased random walks, chinese postman approximation.
+methods: greedy construction, priority-biased random walks with varying bias parameters.
 """
 
 import networkx as nx
 import numpy as np
 import json
 import pickle
-from collections import defaultdict
 import random
 
 
-MAX_CYCLE_TIME_MINUTES = 120  # 2 hours max per cycle
+MAX_CYCLE_TIME_MINUTES = 360  # 6 hours max per cycle
 
 
 def greedy_cycle(G, start_node, max_time=MAX_CYCLE_TIME_MINUTES):
     """
     construct cycle greedily by always choosing highest priority unvisited edge.
+    if no unvisited edges from current location, picks randomly to continue exploring.
 
     args:
         G: networkx graph
@@ -32,22 +32,76 @@ def greedy_cycle(G, start_node, max_time=MAX_CYCLE_TIME_MINUTES):
     visited_edges = set()
     total_time = 0.0
 
+    # collect all edges in the subgraph
+    all_edges = set()
+    for u, v, k in G.edges(keys=True):
+        all_edges.add((u, v, k))
+
     while total_time < max_time:
         # find unvisited edges from current node
-        available_edges = []
+        unvisited_from_here = []
+        visited_from_here = []
+
         for neighbor in G.neighbors(current_node):
             for edge_key in G[current_node][neighbor]:
                 edge_id = (current_node, neighbor, edge_key)
-                if edge_id not in visited_edges:
-                    edge_data = G[current_node][neighbor][edge_key]
-                    available_edges.append((neighbor, edge_key, edge_data))
+                edge_data = G[current_node][neighbor][edge_key]
 
-        if not available_edges:
-            # no more unvisited edges, try to return to start
+                if edge_id not in visited_edges:
+                    unvisited_from_here.append((neighbor, edge_key, edge_data))
+                else:
+                    visited_from_here.append((neighbor, edge_key, edge_data))
+
+        # check if we've visited all edges in the graph
+        unvisited_global = all_edges - visited_edges
+
+        if len(unvisited_from_here) > 0:
+            # prioritize unvisited edges - pick highest priority
+            unvisited_from_here.sort(key=lambda x: x[2]["priority"], reverse=True)
+            next_node, edge_key, edge_data = unvisited_from_here[0]
+
+        elif len(unvisited_global) > 0:
+            # no unvisited edges here, but there are unvisited edges elsewhere
+            # navigate to the nearest unvisited edge
+            target_edge = max(
+                unvisited_global, key=lambda e: G[e[0]][e[1]][e[2]]["priority"]
+            )
+            target_start = target_edge[0]
+
+            try:
+                path = nx.shortest_path(
+                    G, current_node, target_start, weight="travel_time"
+                )
+                # traverse path to target (using already-visited edges)
+                for i in range(len(path) - 1):
+                    if path[i + 1] in G.neighbors(path[i]):
+                        edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                        edge_data = G[path[i]][path[i + 1]][edge_key]
+                        cycle.append((path[i], path[i + 1], edge_key))
+                        total_time += edge_data["travel_time"]
+                        if total_time >= max_time * 0.9:
+                            # time limit reached during navigation
+                            current_node = path[i + 1]
+                            break
+                else:
+                    # completed navigation without time limit
+                    current_node = target_start
+                    continue
+                # if we broke due to time, exit main loop
+                break
+            except nx.NetworkXNoPath:
+                # can't reach unvisited edges - they're in disconnected component
+                break
+
+        elif len(visited_from_here) > 0:
+            # all edges visited globally, pick random edge to continue (allows cycling)
+            next_node, edge_key, edge_data = random.choice(visited_from_here)
+
+        else:
+            # dead end with no outgoing edges - try to return to start
             try:
                 path = nx.shortest_path(G, current_node, start_node)
                 for i in range(len(path) - 1):
-                    # use any edge between consecutive nodes
                     edge_key = list(G[path[i]][path[i + 1]].keys())[0]
                     edge_data = G[path[i]][path[i + 1]][edge_key]
                     cycle.append((path[i], path[i + 1], edge_key))
@@ -56,29 +110,30 @@ def greedy_cycle(G, start_node, max_time=MAX_CYCLE_TIME_MINUTES):
             except nx.NetworkXNoPath:
                 break
 
-        # choose edge with highest priority
-        available_edges.sort(key=lambda x: x[2]["priority"], reverse=True)
-        next_node, edge_key, edge_data = available_edges[0]
-
-        # add to cycle
+        # add chosen edge to cycle
         cycle.append((current_node, next_node, edge_key))
         visited_edges.add((current_node, next_node, edge_key))
         total_time += edge_data["travel_time"]
         current_node = next_node
 
-        # check if we should stop
-        if total_time >= max_time * 0.9:  # leave buffer for return
-            # try to return to start
-            try:
-                path = nx.shortest_path(G, current_node, start_node)
-                for i in range(len(path) - 1):
-                    edge_key = list(G[path[i]][path[i + 1]].keys())[0]
-                    edge_data = G[path[i]][path[i + 1]][edge_key]
-                    cycle.append((path[i], path[i + 1], edge_key))
-                    total_time += edge_data["travel_time"]
-                break
-            except nx.NetworkXNoPath:
-                break
+        # check if we should stop (time limit)
+        if total_time >= max_time * 0.9 and len(unvisited_global) == 0:
+            # covered all edges and approaching time limit - go home
+            break
+
+    # ensure we return to start node
+    if current_node != start_node:
+        try:
+            path = nx.shortest_path(G, current_node, start_node, weight="travel_time")
+            for i in range(len(path) - 1):
+                edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                edge_data = G[path[i]][path[i + 1]][edge_key]
+                cycle.append((path[i], path[i + 1], edge_key))
+                total_time += edge_data["travel_time"]
+        except nx.NetworkXNoPath:
+            print(
+                f"[WARNING] greedy_cycle: cannot return to start from node {current_node}"
+            )
 
     return cycle
 
@@ -150,90 +205,21 @@ def biased_random_walk_cycle(
 
         # check if we should return
         if total_time >= max_time * 0.9:
-            try:
-                path = nx.shortest_path(G, current_node, start_node)
-                for i in range(len(path) - 1):
-                    edge_key = list(G[path[i]][path[i + 1]].keys())[0]
-                    edge_data = G[path[i]][path[i + 1]][edge_key]
-                    cycle.append((path[i], path[i + 1], edge_key))
-                    total_time += edge_data["travel_time"]
-                break
-            except nx.NetworkXNoPath:
-                break
+            break
 
-    return cycle
-
-
-def chinese_postman_cycle(G, start_node):
-    """
-    approximate chinese postman problem solution: cover all edges efficiently.
-
-    args:
-        G: networkx graph
-        start_node: starting node
-
-    returns:
-        list of (node, edge_key) tuples representing the cycle
-    """
-    # convert to undirected for cpp
-    G_undirected = G.to_undirected()
-
-    # find nodes with odd degree
-    odd_degree_nodes = [
-        n for n in G_undirected.nodes() if G_undirected.degree(n) % 2 == 1
-    ]
-
-    # if graph is not eulerian, we need to add edges
-    if len(odd_degree_nodes) > 0:
-        # pair up odd degree nodes and add shortest paths between them
-        # simple greedy pairing
-        paired = set()
-        edges_to_duplicate = []
-
-        for i in range(0, len(odd_degree_nodes), 2):
-            if i + 1 < len(odd_degree_nodes):
-                node1 = odd_degree_nodes[i]
-                node2 = odd_degree_nodes[i + 1]
-                try:
-                    path = nx.shortest_path(G_undirected, node1, node2)
-                    for j in range(len(path) - 1):
-                        edges_to_duplicate.append((path[j], path[j + 1]))
-                except nx.NetworkXNoPath:
-                    pass
-
-    # create eulerian graph (simplified - just use original graph)
-    # traverse using hierholzer's algorithm approximation
-    cycle = []
-    current_node = start_node
-    edge_traversals = defaultdict(int)
-    stack = [current_node]
-    path = []
-
-    while stack:
-        current = stack[-1]
-        found_edge = False
-
-        for neighbor in G.neighbors(current):
-            for edge_key in G[current][neighbor]:
-                edge_id = (current, neighbor, edge_key)
-                if edge_traversals[edge_id] == 0:
-                    edge_traversals[edge_id] += 1
-                    stack.append(neighbor)
-                    found_edge = True
-                    break
-            if found_edge:
-                break
-
-        if not found_edge:
-            path.append(stack.pop())
-
-    # convert path to cycle format
-    path.reverse()
-    for i in range(len(path) - 1):
-        # find an edge between consecutive nodes
-        if path[i + 1] in G.neighbors(path[i]):
-            edge_key = list(G[path[i]][path[i + 1]].keys())[0]
-            cycle.append((path[i], path[i + 1], edge_key))
+    # ensure we return to start node
+    if current_node != start_node:
+        try:
+            path = nx.shortest_path(G, current_node, start_node, weight="travel_time")
+            for i in range(len(path) - 1):
+                edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                edge_data = G[path[i]][path[i + 1]][edge_key]
+                cycle.append((path[i], path[i + 1], edge_key))
+                total_time += edge_data["travel_time"]
+        except nx.NetworkXNoPath:
+            print(
+                f"[WARNING] biased_random_walk_cycle: cannot return to start from node {current_node}"
+            )
 
     return cycle
 
@@ -302,8 +288,8 @@ def generate_cycles_for_partition(G, partition_nodes, num_cycles=50):
     # choose random start nodes
     start_nodes = random.choices(list(partition_nodes), k=num_cycles)
 
-    # distribute across methods
-    methods_per_type = num_cycles // 3
+    # distribute across methods and bias values
+    methods_per_type = num_cycles // 4
 
     print(f"  [INFO] generating {methods_per_type} greedy cycles...")
     for i in range(methods_per_type):
@@ -318,33 +304,29 @@ def generate_cycles_for_partition(G, partition_nodes, num_cycles=50):
             }
         )
 
-    print(f"  [INFO] generating {methods_per_type} random walk cycles...")
-    for i in range(methods_per_type, 2 * methods_per_type):
-        cycle = biased_random_walk_cycle(subgraph, start_nodes[i])
-        metrics = calculate_cycle_metrics(subgraph, cycle)
-        cycles.append(
-            {
-                "method": "random_walk",
-                "cycle": cycle,
-                "metrics": metrics,
-                "start_node": int(start_nodes[i]),
-            }
-        )
+    # try three different priority bias values
+    bias_values = [0.5, 1.0, 2.0]  # low, medium, high bias toward priority
 
-    print(
-        f"  [INFO] generating {num_cycles - 2*methods_per_type} chinese postman cycles..."
-    )
-    for i in range(2 * methods_per_type, num_cycles):
-        cycle = chinese_postman_cycle(subgraph, start_nodes[i])
-        metrics = calculate_cycle_metrics(subgraph, cycle)
-        cycles.append(
-            {
-                "method": "chinese_postman",
-                "cycle": cycle,
-                "metrics": metrics,
-                "start_node": int(start_nodes[i]),
-            }
+    for bias_idx, bias in enumerate(bias_values):
+        start_idx = methods_per_type + (bias_idx * methods_per_type)
+        end_idx = start_idx + methods_per_type
+
+        print(
+            f"  [INFO] generating {methods_per_type} random walk cycles (bias={bias})..."
         )
+        for i in range(start_idx, end_idx):
+            cycle = biased_random_walk_cycle(
+                subgraph, start_nodes[i], priority_bias=bias
+            )
+            metrics = calculate_cycle_metrics(subgraph, cycle)
+            cycles.append(
+                {
+                    "method": f"random_walk_bias_{bias}",
+                    "cycle": cycle,
+                    "metrics": metrics,
+                    "start_node": int(start_nodes[i]),
+                }
+            )
 
     return cycles
 
