@@ -16,190 +16,295 @@ SNOWFALL_RATE_INCHES_PER_HOUR = 1.0
 STORM_DURATION_HOURS = 12
 
 
-def edge_swap_perturbation(G, cycle, num_attempts=5):
+def is_valid_cycle(G, new_cycle, original_cycle):
     """
-    try to swap an edge in the cycle with a nearby edge.
+    validate that a cycle is valid and preserves coverage.
+
+    args:
+        G: networkx graph
+        new_cycle: proposed new cycle
+        original_cycle: original cycle to compare against
+
+    returns:
+        bool indicating if cycle is valid
+    """
+    if not new_cycle or len(new_cycle) == 0:
+        return False
+
+    # check 1: cycle closes (ends at start)
+    if new_cycle[0][0] != new_cycle[-1][1]:
+        return False
+
+    # check 2: cycle is connected (each edge connects to next)
+    for i in range(len(new_cycle) - 1):
+        if new_cycle[i][1] != new_cycle[i + 1][0]:
+            return False
+
+    # check 3: all unique edges from original still present
+    original_unique = set(original_cycle)
+    new_unique = set(new_cycle)
+    if not original_unique.issubset(new_unique):
+        return False
+
+    return True
+
+
+def reorder_by_priority_clustering(G, cycle):
+    """
+    reorder cycle to visit high-priority edges early.
 
     args:
         G: networkx graph
         cycle: list of (from_node, to_node, edge_key) tuples
-        num_attempts: number of random swap attempts
 
     returns:
-        new cycle or none if no valid swap found
-    """
-    if len(cycle) < 2:
-        return None
-
-    for _ in range(num_attempts):
-        # choose random position in cycle
-        pos = random.randint(0, len(cycle) - 1)
-        from_node, to_node, edge_key = cycle[pos]
-
-        # find alternative edges from same start node
-        available_edges = []
-        for neighbor in G.neighbors(from_node):
-            if neighbor != to_node:
-                for alt_key in G[from_node][neighbor]:
-                    available_edges.append((neighbor, alt_key))
-
-        if not available_edges:
-            continue
-
-        # choose random alternative
-        new_to_node, new_edge_key = random.choice(available_edges)
-
-        # try to create valid cycle by connecting new edge
-        # need path from new_to_node to next node in cycle
-        if pos + 1 < len(cycle):
-            next_node = cycle[pos + 1][0]
-            try:
-                # check if we can reach next node
-                if nx.has_path(G, new_to_node, next_node):
-                    # create new cycle with swap
-                    new_cycle = (
-                        cycle[:pos]
-                        + [(from_node, new_to_node, new_edge_key)]
-                        + cycle[pos + 1 :]
-                    )
-                    return new_cycle
-            except:
-                pass
-
-    return None
-
-
-def vertex_insert_perturbation(G, cycle, num_attempts=5):
-    """
-    try to insert a new vertex into the cycle.
-
-    args:
-        G: networkx graph
-        cycle: list of (from_node, to_node, edge_key) tuples
-        num_attempts: number of random insert attempts
-
-    returns:
-        new cycle or none if no valid insert found
-    """
-    if len(cycle) < 2:
-        return None
-
-    for _ in range(num_attempts):
-        # choose random position in cycle
-        pos = random.randint(0, len(cycle) - 1)
-        from_node, to_node, edge_key = cycle[pos]
-
-        # find neighbors of from_node that are not to_node
-        intermediate_nodes = [n for n in G.neighbors(from_node) if n != to_node]
-
-        if not intermediate_nodes:
-            continue
-
-        # choose random intermediate node
-        intermediate = random.choice(intermediate_nodes)
-
-        # check if we can go from intermediate to to_node
-        if to_node in G.neighbors(intermediate):
-            # create path: from_node -> intermediate -> to_node
-            edge1_key = list(G[from_node][intermediate].keys())[0]
-            edge2_key = list(G[intermediate][to_node].keys())[0]
-
-            # create new cycle with inserted vertex
-            new_cycle = (
-                cycle[:pos]
-                + [
-                    (from_node, intermediate, edge1_key),
-                    (intermediate, to_node, edge2_key),
-                ]
-                + cycle[pos + 1 :]
-            )
-            return new_cycle
-
-    return None
-
-
-def vertex_remove_perturbation(G, cycle, num_attempts=5):
-    """
-    try to remove a vertex from the cycle.
-
-    args:
-        G: networkx graph
-        cycle: list of (from_node, to_node, edge_key) tuples
-        num_attempts: number of random remove attempts
-
-    returns:
-        new cycle or none if no valid remove found
+        reordered cycle or none if failed
     """
     if len(cycle) < 3:
         return None
 
+    try:
+        # extract unique edges with priorities
+        unique_edges = list(set(cycle))
+        edge_priorities = []
+        for u, v, k in unique_edges:
+            priority = G[u][v][k]["priority"]
+            edge_priorities.append((u, v, k, priority))
+
+        # sort by priority (descending)
+        edge_priorities.sort(key=lambda x: x[3], reverse=True)
+
+        # build new cycle starting from highest priority edge
+        start_edge = edge_priorities[0][:3]
+        visited = {start_edge}
+        new_cycle = [start_edge]
+        current_node = start_edge[1]
+
+        # greedily add nearest unvisited edge
+        while len(visited) < len(unique_edges):
+            # find unvisited edges and their distances from current node
+            candidates = []
+            for u, v, k, p in edge_priorities:
+                edge = (u, v, k)
+                if edge not in visited:
+                    try:
+                        # distance from current node to edge start
+                        dist = nx.shortest_path_length(
+                            G, current_node, u, weight="travel_time"
+                        )
+                        candidates.append((edge, dist, p))
+                    except nx.NetworkXNoPath:
+                        pass
+
+            if not candidates:
+                break
+
+            # choose nearest unvisited edge (with priority tie-breaker)
+            candidates.sort(key=lambda x: (x[1], -x[2]))
+            next_edge, dist, _ = candidates[0]
+
+            # add connector path if needed
+            if current_node != next_edge[0]:
+                try:
+                    path = nx.shortest_path(
+                        G, current_node, next_edge[0], weight="travel_time"
+                    )
+                    for i in range(len(path) - 1):
+                        if path[i + 1] in G.neighbors(path[i]):
+                            edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                            new_cycle.append((path[i], path[i + 1], edge_key))
+                except nx.NetworkXNoPath:
+                    return None
+
+            # add the edge
+            new_cycle.append(next_edge)
+            visited.add(next_edge)
+            current_node = next_edge[1]
+
+        # close the cycle
+        start_node = new_cycle[0][0]
+        if current_node != start_node:
+            try:
+                path = nx.shortest_path(
+                    G, current_node, start_node, weight="travel_time"
+                )
+                for i in range(len(path) - 1):
+                    if path[i + 1] in G.neighbors(path[i]):
+                        edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                        new_cycle.append((path[i], path[i + 1], edge_key))
+            except nx.NetworkXNoPath:
+                return None
+
+        return new_cycle
+
+    except Exception as e:
+        return None
+
+
+def optimize_connectors(G, cycle):
+    """
+    optimize connector paths between required edges.
+
+    args:
+        G: networkx graph
+        cycle: list of (from_node, to_node, edge_key) tuples
+
+    returns:
+        optimized cycle or none if failed
+    """
+    if len(cycle) < 3:
+        return None
+
+    try:
+        # identify unique edges (required) vs connectors (repeated)
+        edge_counts = {}
+        for edge in cycle:
+            edge_counts[edge] = edge_counts.get(edge, 0) + 1
+
+        required_edges = [e for e, count in edge_counts.items() if count == 1]
+        if len(required_edges) < 2:
+            return None
+
+        # rebuild cycle with optimized connectors
+        new_cycle = [required_edges[0]]
+        current_node = required_edges[0][1]
+
+        for next_edge in required_edges[1:]:
+            # find shortest path connector
+            if current_node != next_edge[0]:
+                try:
+                    path = nx.shortest_path(
+                        G, current_node, next_edge[0], weight="travel_time"
+                    )
+                    for i in range(len(path) - 1):
+                        if path[i + 1] in G.neighbors(path[i]):
+                            edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                            new_cycle.append((path[i], path[i + 1], edge_key))
+                except nx.NetworkXNoPath:
+                    return None
+
+            new_cycle.append(next_edge)
+            current_node = next_edge[1]
+
+        # close cycle
+        start_node = new_cycle[0][0]
+        if current_node != start_node:
+            try:
+                path = nx.shortest_path(
+                    G, current_node, start_node, weight="travel_time"
+                )
+                for i in range(len(path) - 1):
+                    if path[i + 1] in G.neighbors(path[i]):
+                        edge_key = list(G[path[i]][path[i + 1]].keys())[0]
+                        new_cycle.append((path[i], path[i + 1], edge_key))
+            except nx.NetworkXNoPath:
+                return None
+
+        return new_cycle
+
+    except Exception as e:
+        return None
+
+
+def swap_adjacent_sequences(G, cycle, num_attempts=10):
+    """
+    try swapping order of adjacent edge sequences.
+
+    args:
+        G: networkx graph
+        cycle: list of (from_node, to_node, edge_key) tuples
+        num_attempts: number of swap attempts
+
+    returns:
+        modified cycle or none if no improvement
+    """
+    if len(cycle) < 6:
+        return None
+
     for _ in range(num_attempts):
-        # choose random position (not first or last)
-        pos = random.randint(1, len(cycle) - 2)
+        # choose two adjacent segments
+        seq_len = random.randint(2, min(4, len(cycle) // 3))
+        start1 = random.randint(0, len(cycle) - 2 * seq_len - 1)
+        start2 = start1 + seq_len
 
-        # get nodes: prev -> current -> next
-        prev_node = cycle[pos - 1][0]
-        current_to = cycle[pos][1]
-        next_from = cycle[pos + 1][0]
+        seq1 = cycle[start1 : start1 + seq_len]
+        seq2 = cycle[start2 : start2 + seq_len]
 
-        # check if current edge is skippable
-        # we want to go directly from prev_node to next destination
-        next_to = cycle[pos + 1][1]
+        # try swapping them
+        new_cycle = (
+            cycle[:start1]
+            + seq2
+            + cycle[start1 + seq_len : start2]
+            + seq1
+            + cycle[start2 + seq_len :]
+        )
 
-        # check if we can connect prev_node directly to next_from
-        if next_from in G.neighbors(prev_node):
-            edge_key = list(G[prev_node][next_from].keys())[0]
+        # check connectivity
+        valid = True
+        for i in range(len(new_cycle) - 1):
+            if new_cycle[i][1] != new_cycle[i + 1][0]:
+                valid = False
+                break
 
-            # create new cycle without the middle edge
-            new_cycle = (
-                cycle[:pos] + [(prev_node, next_from, edge_key)] + cycle[pos + 2 :]
-            )
+        if valid and new_cycle[0][0] == new_cycle[-1][1]:
             return new_cycle
 
     return None
 
 
-def two_opt_perturbation(cycle, num_attempts=5):
+def two_opt_edge_order(G, cycle):
     """
-    try 2-opt style move: reverse a subsection of the cycle.
+    apply 2-opt to improve edge ordering.
 
     args:
+        G: networkx graph
         cycle: list of (from_node, to_node, edge_key) tuples
-        num_attempts: number of random 2-opt attempts
 
     returns:
-        new cycle or none if no valid move found
+        improved cycle or none if no improvement
     """
     if len(cycle) < 4:
         return None
 
-    for _ in range(num_attempts):
-        # choose two random positions
-        i = random.randint(0, len(cycle) - 3)
-        j = random.randint(i + 2, len(cycle) - 1)
+    best_cycle = cycle
+    best_time = sum(G[u][v][k]["travel_time"] for u, v, k in cycle)
+    improved = True
 
-        # reverse subsection (note: this may break connectivity)
-        # for now, just try it and validate later
-        new_cycle = cycle[:i] + cycle[i : j + 1][::-1] + cycle[j + 1 :]
+    while improved:
+        improved = False
+        for i in range(1, len(cycle) - 2):
+            for j in range(i + 1, len(cycle)):
+                # try reversing segment [i:j]
+                new_cycle = cycle[:i] + cycle[i:j][::-1] + cycle[j:]
 
-        # simple validation: check that consecutive edges connect
-        valid = True
-        for k in range(len(new_cycle) - 1):
-            if new_cycle[k][1] != new_cycle[k + 1][0]:
-                valid = False
+                # check connectivity
+                valid = True
+                for k in range(len(new_cycle) - 1):
+                    if new_cycle[k][1] != new_cycle[k + 1][0]:
+                        valid = False
+                        break
+
+                if valid and new_cycle[0][0] == new_cycle[-1][1]:
+                    new_time = sum(G[u][v][k]["travel_time"] for u, v, k in new_cycle)
+                    if new_time < best_time:
+                        best_cycle = new_cycle
+                        best_time = new_time
+                        improved = True
+                        break
+
+            if improved:
                 break
 
-        if valid:
-            return new_cycle
+        cycle = best_cycle
 
-    return None
+    return best_cycle if best_cycle != cycle else None
 
 
 def optimize_cycle(
     G, cycle, max_iterations=20, snowfall_rate=None, storm_duration=None
 ):
     """
-    optimize a cycle using local search with perturbations.
+    optimize a cycle using ordering and routing improvements.
 
     args:
         G: networkx graph
@@ -220,64 +325,43 @@ def optimize_cycle(
     current_benefit_metrics = calculate_cycle_benefit(
         G, cycle, snowfall_rate, storm_duration
     )
-    current_benefit = current_benefit_metrics["benefit_per_minute"]
     best_cycle = cycle
-    best_benefit = current_benefit
+    best_benefit = current_benefit_metrics["benefit_per_minute"]
 
-    no_improvement_count = 0
+    print(f"    [DEBUG] initial benefit: {best_benefit:.4f}")
 
+    # use 2-opt optimization
     for iteration in range(max_iterations):
-        # try different perturbations
-        perturbations = []
+        try:
+            new_cycle = two_opt_edge_order(G, best_cycle)
 
-        # edge swap
-        new_cycle = edge_swap_perturbation(G, best_cycle)
-        if new_cycle:
-            perturbations.append(("edge_swap", new_cycle))
-
-        # vertex insert
-        new_cycle = vertex_insert_perturbation(G, best_cycle)
-        if new_cycle:
-            perturbations.append(("vertex_insert", new_cycle))
-
-        # vertex remove
-        new_cycle = vertex_remove_perturbation(G, best_cycle)
-        if new_cycle:
-            perturbations.append(("vertex_remove", new_cycle))
-
-        # 2-opt
-        new_cycle = two_opt_perturbation(best_cycle)
-        if new_cycle:
-            perturbations.append(("two_opt", new_cycle))
-
-        if not perturbations:
-            break  # no valid perturbations
-
-        # evaluate all perturbations
-        improved = False
-        for perturb_type, new_cycle in perturbations:
-            try:
+            # validate and evaluate
+            if new_cycle and is_valid_cycle(G, new_cycle, cycle):
                 new_benefit_metrics = calculate_cycle_benefit(
                     G, new_cycle, snowfall_rate, storm_duration
                 )
                 new_benefit = new_benefit_metrics["benefit_per_minute"]
 
                 # accept if improvement
-                if new_benefit > best_benefit:
+                if new_benefit > best_benefit * 1.001:  # 0.1% threshold
+                    print(
+                        f"    [DEBUG] iteration {iteration}: {best_benefit:.4f} -> {new_benefit:.4f}"
+                    )
                     best_cycle = new_cycle
                     best_benefit = new_benefit
-                    improved = True
-                    break  # accept first improvement
-            except:
-                pass  # invalid cycle
+                else:
+                    # no improvement, stop
+                    break
 
-        if not improved:
-            no_improvement_count += 1
-            if no_improvement_count >= 5:
-                break  # converged
-        else:
-            no_improvement_count = 0
+            else:
+                # no valid cycle found, stop
+                break
 
+        except Exception as e:
+            # operator failed, stop
+            break
+
+    print(f"    [DEBUG] final benefit: {best_benefit:.4f}")
     return best_cycle
 
 
@@ -328,6 +412,8 @@ def optimize_selected_cycles(G, selected_cycles, max_iterations=20):
                 "benefit": float(benefit_metrics["benefit"]),
                 "benefit_per_minute": float(benefit_metrics["benefit_per_minute"]),
                 "cycle_time": float(benefit_metrics["cycle_time"]),
+                "num_complete_cycles": int(benefit_metrics["num_complete_cycles"]),
+                "coverage_ratio": float(benefit_metrics["coverage_ratio"]),
             }
 
             # recalculate metrics
