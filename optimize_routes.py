@@ -9,6 +9,7 @@ import numpy as np
 import json
 import pickle
 import random
+import time
 from evaluate_cycles import calculate_cycle_benefit
 
 
@@ -266,16 +267,30 @@ def two_opt_edge_order(G, cycle):
     if len(cycle) < 4:
         return None
 
-    best_cycle = cycle
-    best_time = sum(G[u][v][k]["travel_time"] for u, v, k in cycle)
-    improved = True
+    initial_cycle = list(cycle)
+    best_cycle = list(cycle)
+    best_time = sum(G[u][v][k]["travel_time"] for u, v, k in best_cycle)
 
+    max_evals = 10000            
+    max_seconds = 10.0            
+    eval_count = 0
+    start_time = time.time()
+
+    improved = True
     while improved:
         improved = False
-        for i in range(1, len(cycle) - 2):
-            for j in range(i + 1, len(cycle)):
+        n = len(best_cycle)
+        for i in range(1, n - 2):
+            for j in range(i + 1, n):
                 # try reversing segment [i:j]
-                new_cycle = cycle[:i] + cycle[i:j][::-1] + cycle[j:]
+                # stop if we've used too much time or too many evaluations
+                eval_count += 1
+                if eval_count > max_evals or (time.time() - start_time) > max_seconds:
+                    # return current best (if different) or None
+                    return best_cycle if best_cycle != initial_cycle else None
+
+                # try reversing segment [i:j)
+                new_cycle = best_cycle[:i] + best_cycle[i:j][::-1] + best_cycle[j:]
 
                 # check connectivity
                 valid = True
@@ -284,20 +299,27 @@ def two_opt_edge_order(G, cycle):
                         valid = False
                         break
 
-                if valid and new_cycle[0][0] == new_cycle[-1][1]:
-                    new_time = sum(G[u][v][k]["travel_time"] for u, v, k in new_cycle)
-                    if new_time < best_time:
-                        best_cycle = new_cycle
-                        best_time = new_time
-                        improved = True
-                        break
+                if not valid:
+                    continue
+
+                # cycle must close
+                if new_cycle[0][0] != new_cycle[-1][1]:
+                    continue
+
+                # compute travel time for candidate
+                new_time = sum(G[u][v][k]["travel_time"] for u, v, k in new_cycle)
+
+                if new_time < best_time - 1e-6:  # small tolerance
+                    best_cycle = new_cycle
+                    best_time = new_time
+                    improved = True
+                    break
 
             if improved:
                 break
 
-        cycle = best_cycle
 
-    return best_cycle if best_cycle != cycle else None
+    return best_cycle if best_cycle != initial_cycle else None
 
 
 def optimize_cycle(
@@ -347,7 +369,7 @@ def optimize_cycle(
                 )
 
                 # accept if improvement
-                if new_benefit > best_benefit * 1.001:  # 0.1% threshold
+                if new_benefit > best_benefit * 1.0001:  # 0.1% threshold
                     print(
                         f"    [DEBUG] iteration {iteration}: {best_benefit:.2f}% -> {new_benefit:.2f}%"
                     )
