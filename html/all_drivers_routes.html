@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_687efe2796f4e8bf3015d01e453153fd {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+    <div style="position: fixed; 
+                bottom: 50px; right: 50px; width: 200px; 
+                background-color: white; border:2px solid grey; 
+                z-index:9999; font-size:14px; padding: 10px;
+                border-radius: 5px;">
+    <h4 style="margin: 0 0 10px 0;">Driver Routes</h4>
+    <p style="margin: 5px 0;"><span style="color: red; font-size: 20px;">&#9632;</span> Driver 0: 2.1min, 9187 b/m</p><p style="margin: 5px 0;"><span style="color: blue; font-size: 20px;">&#9632;</span> Driver 1: 3.8min, 12922 b/m</p><p style="margin: 5px 0;"><span style="color: green; font-size: 20px;">&#9632;</span> Driver 2: 0.2min, 12443 b/m</p><p style="margin: 5px 0;"><span style="color: purple; font-size: 20px;">&#9632;</span> Driver 3: 0.1min, 24989 b/m</p><p style="margin: 5px 0;"><span style="color: orange; font-size: 20px;">&#9632;</span> Driver 4: 0.9min, 17752 b/m</p><p style="margin: 5px 0;"><span style="color: darkred; font-size: 20px;">&#9632;</span> Driver 5: 0.1min, 55676 b/m</p><p style="margin: 5px 0;"><span style="color: lightblue; font-size: 20px;">&#9632;</span> Driver 6: 3.0min, 15901 b/m</p><p style="margin: 5px 0;"><span style="color: darkgreen; font-size: 20px;">&#9632;</span> Driver 7: 0.7min, 17995 b/m</p></div>
+    
+            <div class="folium-map" id="map_687efe2796f4e8bf3015d01e453153fd" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_687efe2796f4e8bf3015d01e453153fd = L.map(
+                "map_687efe2796f4e8bf3015d01e453153fd",
+                {
+                    center: [42.45, -76.5],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 13,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_ce94ebed8fc96a5213775be00d2f90d0 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_ce94ebed8fc96a5213775be00d2f90d0.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_e37bb7258360ebcd4407a5254a2a8383 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_710e5c44a6c1f55af195efe414aba79c = L.polyline(
+                [[42.43597914890443, -76.50819383824974], [42.43625342011819, -76.50820237453202], [42.436486844952924, -76.50820950483], [42.436573749597606, -76.50821386158198]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_710e5c44a6c1f55af195efe414aba79c.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_a0a0faa19115249f7c07cf40660ebbec = L.polyline(
+                [[42.433755334885795, -76.50809702037729], [42.43516347406332, -76.50816616853008], [42.43569464112181, -76.50818498246812], [42.43597914890443, -76.50819383824974]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_a0a0faa19115249f7c07cf40660ebbec.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_13a3620d0554456146cf9521fb8c8a7b = L.polyline(
+                [[42.432629443455546, -76.5080434509567], [42.4326300709796, -76.50804347937357], [42.43318817049285, -76.50806897409115], [42.43375501707175, -76.50809700495788], [42.433755334885795, -76.50809702037729]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_13a3620d0554456146cf9521fb8c8a7b.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_f1104797ad77c3b030ecf061bd39acc3 = L.polyline(
+                [[42.428427383862314, -76.50816704069892], [42.42848635721315, -76.50812784520755], [42.42863140049811, -76.5080501179219], [42.428690380054704, -76.50802180237187], [42.428803544584646, -76.50797675461938], [42.42887590403542, -76.5079521282172], [42.42893917867383, -76.50793445786148], [42.428993364252705, -76.50791865042402], [42.42909282636425, -76.50789977968329], [42.42917839984824, -76.50788810168052], [42.429273066956064, -76.50788150592389], [42.4294847085268, -76.50788449323454], [42.429602019767444, -76.50788597250981], [42.42980439984482, -76.50788874005292], [42.429862884648436, -76.50789121592734], [42.429916911194084, -76.50789369836755], [42.42995738754569, -76.50789503889749], [42.430015873414376, -76.50789913596779], [42.43009237029515, -76.50790552656521], [42.43016869401346, -76.50791145436219], [42.43022272177346, -76.50791578770978], [42.4304043245183, -76.50793178560977], [42.43040739740368, -76.50793205658218], [42.43044312048068, -76.50793520268756], [42.43050160679933, -76.50793999375675], [42.43092885396953, -76.50797629314968], [42.43177508548459, -76.50800398766165], [42.432629443455546, -76.5080434509567]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_f1104797ad77c3b030ecf061bd39acc3.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_9e3869b503650a0818b42b63d27d6718 = L.polyline(
+                [[42.428427383862314, -76.50816704069892], [42.428373168373625, -76.5078318472325]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_9e3869b503650a0818b42b63d27d6718.bindTooltip(
+                `<div>
+                     Driver 0 - ELMIRA RD
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ea8c4fe51e7ef4712d9978dbe4de3e6a = L.polyline(
+                [[42.432629443455546, -76.5080434509567], [42.4326300709796, -76.50804347937357], [42.43318817049285, -76.50806897409115], [42.43375501707175, -76.50809700495788], [42.433755334885795, -76.50809702037729]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_ea8c4fe51e7ef4712d9978dbe4de3e6a.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ea2097d62f42d390d0fa6aa99a551917 = L.polyline(
+                [[42.433755334885795, -76.50809702037729], [42.43516347406332, -76.50816616853008], [42.43569464112181, -76.50818498246812], [42.43597914890443, -76.50819383824974]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_ea2097d62f42d390d0fa6aa99a551917.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_f3e02016ad482b19d0c7d38e35925407 = L.polyline(
+                [[42.43597914890443, -76.50819383824974], [42.43625342011819, -76.50820237453202], [42.436486844952924, -76.50820950483], [42.436573749597606, -76.50821386158198]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e37bb7258360ebcd4407a5254a2a8383);
+        
+    
+            poly_line_f3e02016ad482b19d0c7d38e35925407.bindTooltip(
+                `<div>
+                     Driver 0 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_e37bb7258360ebcd4407a5254a2a8383.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_f53f604e7f8968a2f4942beb76f25fa5 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_bbf351156692988eddcb504025a2b0e9 = L.polyline(
+                [[42.44005314476427, -76.51059806757591], [42.440282458744896, -76.51061401078906], [42.440386051766936, -76.51061944818842], [42.44049856323496, -76.51062510745193], [42.44061553563143, -76.51063214966388], [42.44087640369148, -76.51064481495636], [42.44095238310787, -76.51064773791313]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_bbf351156692988eddcb504025a2b0e9.bindTooltip(
+                `<div>
+                     Driver 1 - N FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_a82af077124b7a5815df69355dab4c75 = L.polyline(
+                [[42.44095238310787, -76.51064773791313], [42.441407407012726, -76.51067522931153], [42.44172247350996, -76.51069061097972], [42.441911479904114, -76.51070011795817], [42.442019359352955, -76.51070439351716], [42.44211386254507, -76.51070914643415], [42.44225741417508, -76.51071036998998]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_a82af077124b7a5815df69355dab4c75.bindTooltip(
+                `<div>
+                     Driver 1 - N FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_6d534caac406f744e8b86fab89a4e699 = L.polyline(
+                [[42.44095238310787, -76.51064773791313], [42.441407407012726, -76.51067522931153], [42.44172247350996, -76.51069061097972], [42.441911479904114, -76.51070011795817], [42.442019359352955, -76.51070439351716], [42.44211386254507, -76.51070914643415], [42.44225741417508, -76.51071036998998]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_6d534caac406f744e8b86fab89a4e699.bindTooltip(
+                `<div>
+                     Driver 1 - N FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_a6f8a43a7fc68cece8f5d0f7cf6094e0 = L.polyline(
+                [[42.44005314476427, -76.51059806757591], [42.440282458744896, -76.51061401078906], [42.440386051766936, -76.51061944818842], [42.44049856323496, -76.51062510745193], [42.44061553563143, -76.51063214966388], [42.44087640369148, -76.51064481495636], [42.44095238310787, -76.51064773791313]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_a6f8a43a7fc68cece8f5d0f7cf6094e0.bindTooltip(
+                `<div>
+                     Driver 1 - N FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_2d5fd1676291d28a09cda8a5babdf5d0 = L.polyline(
+                [[42.439198122095426, -76.51049833498361], [42.4392662215358, -76.51051585233608], [42.439360561649245, -76.51053449890279], [42.43942350855743, -76.51054044623012], [42.43950446400718, -76.5105477620037], [42.43959879734998, -76.51055575756212], [42.43966637565547, -76.51056216266723], [42.439747330365094, -76.51056832015506], [42.44005314476427, -76.51059806757591]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_2d5fd1676291d28a09cda8a5babdf5d0.bindTooltip(
+                `<div>
+                     Driver 1 - N FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_fe91d2a4258b867bcc8c000d6cecfc32 = L.polyline(
+                [[42.43829949622365, -76.51006407619842], [42.43839747649386, -76.51014361249432], [42.438665802916894, -76.51028500453462], [42.43888076328606, -76.51038385559235], [42.43896139047252, -76.51041432588787], [42.439198122095426, -76.51049833498361]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_fe91d2a4258b867bcc8c000d6cecfc32.bindTooltip(
+                `<div>
+                     Driver 1 - S FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_7631f8baf283afbb4686d69d0ebf25cb = L.polyline(
+                [[42.43829949622365, -76.51006407619842], [42.43839747649386, -76.51014361249432], [42.438665802916894, -76.51028500453462], [42.43888076328606, -76.51038385559235], [42.43896139047252, -76.51041432588787], [42.439198122095426, -76.51049833498361]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_7631f8baf283afbb4686d69d0ebf25cb.bindTooltip(
+                `<div>
+                     Driver 1 - S FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_042ae608bcbd3179658e678d0a69628f = L.polyline(
+                [[42.439198122095426, -76.51049833498361], [42.4392662215358, -76.51051585233608], [42.439360561649245, -76.51053449890279], [42.43942350855743, -76.51054044623012], [42.43950446400718, -76.5105477620037], [42.43959879734998, -76.51055575756212], [42.43966637565547, -76.51056216266723], [42.439747330365094, -76.51056832015506], [42.44005314476427, -76.51059806757591]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_042ae608bcbd3179658e678d0a69628f.bindTooltip(
+                `<div>
+                     Driver 1 - N FULTON ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_d8b52a8d2d52b393160380434eefe425 = L.polyline(
+                [[42.44012272467207, -76.5083880862546], [42.44007487240083, -76.50997633506178], [42.44006926040297, -76.51005020485262], [42.4400544530042, -76.5104975741992], [42.44005323404871, -76.5105912182686]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_d8b52a8d2d52b393160380434eefe425.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_66d975fedb8cd61ad6abfd82d1546095 = L.polyline(
+                [[42.43926311752467, -76.508344644212], [42.439263277782416, -76.50834465252915], [42.43961419046985, -76.50836090546561], [42.44012272467207, -76.5083880862546]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_66d975fedb8cd61ad6abfd82d1546095.bindTooltip(
+                `<div>
+                     Driver 1 - N MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_bba2fde595195122689ef463447aedb2 = L.polyline(
+                [[42.43835426767871, -76.50830382788499], [42.43875920536559, -76.50832024808155], [42.43926311752467, -76.508344644212]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_bba2fde595195122689ef463447aedb2.bindTooltip(
+                `<div>
+                     Driver 1 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_10012121ce6cfd91a8fc594ae45de7d2 = L.polyline(
+                [[42.43835426767871, -76.50830382788499], [42.43875920536559, -76.50832024808155], [42.43926311752467, -76.508344644212]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_10012121ce6cfd91a8fc594ae45de7d2.bindTooltip(
+                `<div>
+                     Driver 1 - S MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_814c8a9c406227b48d7643980a18aea4 = L.polyline(
+                [[42.43926311752467, -76.508344644212], [42.439263277782416, -76.50834465252915], [42.43961419046985, -76.50836090546561], [42.44012272467207, -76.5083880862546]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_814c8a9c406227b48d7643980a18aea4.bindTooltip(
+                `<div>
+                     Driver 1 - N MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_48eddf594a82ac1d8908a75fb0815884 = L.polyline(
+                [[42.44012272467207, -76.5083880862546], [42.44046026121201, -76.5084064389238], [42.4410317393076, -76.5084363228758], [42.441032763878034, -76.5084363787838]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_48eddf594a82ac1d8908a75fb0815884.bindTooltip(
+                `<div>
+                     Driver 1 - N MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_a376e144c9d2b9a81d28702765f52c88 = L.polyline(
+                [[42.441032763878034, -76.5084363787838], [42.44157165997929, -76.50846578182514], [42.44232035559506, -76.50850306508165]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_a376e144c9d2b9a81d28702765f52c88.bindTooltip(
+                `<div>
+                     Driver 1 - N MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_b60caed65a05fd820944e3585eb2be26 = L.polyline(
+                [[42.441032763878034, -76.5084363787838], [42.44157165997929, -76.50846578182514], [42.44232035559506, -76.50850306508165]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_b60caed65a05fd820944e3585eb2be26.bindTooltip(
+                `<div>
+                     Driver 1 - N MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_557a894986d4fb0aa6bb3426259fc3ed = L.polyline(
+                [[42.44012272467207, -76.5083880862546], [42.44046026121201, -76.5084064389238], [42.4410317393076, -76.5084363228758], [42.441032763878034, -76.5084363787838]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_557a894986d4fb0aa6bb3426259fc3ed.bindTooltip(
+                `<div>
+                     Driver 1 - N MEADOW ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_4262587778d41f893132dbaa3a1238b8 = L.polyline(
+                [[42.44012272467207, -76.5083880862546], [42.44007487240083, -76.50997633506178], [42.44006926040297, -76.51005020485262], [42.4400544530042, -76.5104975741992], [42.44005323404871, -76.5105912182686]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_4262587778d41f893132dbaa3a1238b8.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_19fec2f88d64b47a1ba470484bebe6ac = L.polyline(
+                [[42.44005323404871, -76.5105912182686], [42.44005314476427, -76.51059806757591], [42.44005096202203, -76.51067262857569], [42.44002673294417, -76.51148331513198]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_19fec2f88d64b47a1ba470484bebe6ac.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_fc1e189e44fc1dc37546251889301851 = L.polyline(
+                [[42.44002673294417, -76.51148331513198], [42.440008216076876, -76.51209843691069]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_fc1e189e44fc1dc37546251889301851.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_536f03c64647c2fa34ea4e6fbf38bb16 = L.polyline(
+                [[42.440008216076876, -76.51209843691069], [42.44000459538647, -76.51221780425297], [42.43997912245774, -76.51290460625282], [42.43997534604712, -76.5131796892479]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_536f03c64647c2fa34ea4e6fbf38bb16.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_9596991255f356f908aa58046ee66bb8 = L.polyline(
+                [[42.440008216076876, -76.51209843691069], [42.44000459538647, -76.51221780425297], [42.43997912245774, -76.51290460625282], [42.43997534604712, -76.5131796892479]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_9596991255f356f908aa58046ee66bb8.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_c667e68e9a3d3fb0e74209bfda2a78c1 = L.polyline(
+                [[42.44002673294417, -76.51148331513198], [42.440008216076876, -76.51209843691069]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_c667e68e9a3d3fb0e74209bfda2a78c1.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_645c27497f10d69c0caecd392e76085c = L.polyline(
+                [[42.44005323404871, -76.5105912182686], [42.44005314476427, -76.51059806757591], [42.44005096202203, -76.51067262857569], [42.44002673294417, -76.51148331513198]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_f53f604e7f8968a2f4942beb76f25fa5);
+        
+    
+            poly_line_645c27497f10d69c0caecd392e76085c.bindTooltip(
+                `<div>
+                     Driver 1 - W SENECA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_f53f604e7f8968a2f4942beb76f25fa5.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_22349f3afcbc422236f6f4c89e40b9a2 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_944d5613496592c1a6f90e95c700b4a2 = L.polyline(
+                [[42.44070270790152, -76.51442552246546], [42.44091820535179, -76.51474462165812], [42.440943439451864, -76.51478187329636], [42.44115667135377, -76.51509591484479]],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "green", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_22349f3afcbc422236f6f4c89e40b9a2);
+        
+    
+            poly_line_944d5613496592c1a6f90e95c700b4a2.bindTooltip(
+                `<div>
+                     Driver 2 - W STATE ST/ M. L. K. JR ST BRIDGE
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_bf155aea9ce0b7572e11196b07c4d806 = L.polyline(
+                [[42.44070270790152, -76.51442552246546], [42.44091820535179, -76.51474462165812], [42.440943439451864, -76.51478187329636], [42.44115667135377, -76.51509591484479]],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "green", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_22349f3afcbc422236f6f4c89e40b9a2);
+        
+    
+            poly_line_bf155aea9ce0b7572e11196b07c4d806.bindTooltip(
+                `<div>
+                     Driver 2 - W STATE ST/ M. L. K. JR ST BRIDGE
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_22349f3afcbc422236f6f4c89e40b9a2.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_d08d6722500a26ea2d10f52a925a900f = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_faa726f1d9fb4e4b054a77c8b43e764b = L.polyline(
+                [[42.454728064542124, -76.51364357071164], [42.454808000850335, -76.51338547578123]],
+                {"bubblingMouseEvents": true, "color": "purple", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "purple", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_d08d6722500a26ea2d10f52a925a900f);
+        
+    
+            poly_line_faa726f1d9fb4e4b054a77c8b43e764b.bindTooltip(
+                `<div>
+                     Driver 3 - COVE LA
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ec517a1637ed91ae18e90363fb9d6f7e = L.polyline(
+                [[42.454728064542124, -76.51364357071164], [42.454808000850335, -76.51338547578123]],
+                {"bubblingMouseEvents": true, "color": "purple", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "purple", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_d08d6722500a26ea2d10f52a925a900f);
+        
+    
+            poly_line_ec517a1637ed91ae18e90363fb9d6f7e.bindTooltip(
+                `<div>
+                     Driver 3 - COVE LA
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_d08d6722500a26ea2d10f52a925a900f.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_e61de2fe9c63476eb71716737a46a7e0 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_53c2dea7b474449e2a322405bee210d7 = L.polyline(
+                [[42.44116030456228, -76.48199616356635], [42.441160454572824, -76.48199679902937], [42.4413191325223, -76.48262034756311], [42.44142517033702, -76.48306545497303], [42.44151554257745, -76.48344482878984], [42.44156253620769, -76.48364250092959]],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "orange", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e61de2fe9c63476eb71716737a46a7e0);
+        
+    
+            poly_line_53c2dea7b474449e2a322405bee210d7.bindTooltip(
+                `<div>
+                     Driver 4 - DRYDEN RD
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ad37fca4cbb02e0d252745bd3d629036 = L.polyline(
+                [[42.44116030456228, -76.48199616356635], [42.441160454572824, -76.48199679902937], [42.4413191325223, -76.48262034756311], [42.44142517033702, -76.48306545497303], [42.44151554257745, -76.48344482878984], [42.44156253620769, -76.48364250092959]],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "orange", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e61de2fe9c63476eb71716737a46a7e0);
+        
+    
+            poly_line_ad37fca4cbb02e0d252745bd3d629036.bindTooltip(
+                `<div>
+                     Driver 4 - DRYDEN RD
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_6fb3e3a3cdeffa4e7b3924e6b0a0eb3d = L.polyline(
+                [[42.44156253620769, -76.48364250092959], [42.44162226240893, -76.48388901168674], [42.44163898784654, -76.48399156300509], [42.44164631039822, -76.48412932662762], [42.44164504112154, -76.48422419766669]],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "orange", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e61de2fe9c63476eb71716737a46a7e0);
+        
+    
+            poly_line_6fb3e3a3cdeffa4e7b3924e6b0a0eb3d.bindTooltip(
+                `<div>
+                     Driver 4 - DRYDEN RD
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_558087c866c75ebecc725edff7e453c0 = L.polyline(
+                [[42.44156253620769, -76.48364250092959], [42.44162226240893, -76.48388901168674], [42.44163898784654, -76.48399156300509], [42.44164631039822, -76.48412932662762], [42.44164504112154, -76.48422419766669]],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "orange", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e61de2fe9c63476eb71716737a46a7e0);
+        
+    
+            poly_line_558087c866c75ebecc725edff7e453c0.bindTooltip(
+                `<div>
+                     Driver 4 - DRYDEN RD
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ad712a5bff7829f5d0de9e6f95cc58e8 = L.polyline(
+                [[42.44067554441571, -76.48329287545457], [42.4407824607597, -76.483370506425], [42.440813699124995, -76.48339940123532], [42.44087170405221, -76.4834395989473], [42.440992169395074, -76.48351790416608], [42.44104141434261, -76.48354352763498], [42.441144525060125, -76.48358504339288], [42.441234243712294, -76.48360875159224], [42.44129273483716, -76.48361699473352], [42.44156253620769, -76.48364250092959]],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "orange", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e61de2fe9c63476eb71716737a46a7e0);
+        
+    
+            poly_line_ad712a5bff7829f5d0de9e6f95cc58e8.bindTooltip(
+                `<div>
+                     Driver 4 - BRYANT AVE
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_936b402433ab3d10d5b03487fb6ea80f = L.polyline(
+                [[42.44067554441571, -76.48329287545457], [42.4407824607597, -76.483370506425], [42.440813699124995, -76.48339940123532], [42.44087170405221, -76.4834395989473], [42.440992169395074, -76.48351790416608], [42.44104141434261, -76.48354352763498], [42.441144525060125, -76.48358504339288], [42.441234243712294, -76.48360875159224], [42.44129273483716, -76.48361699473352], [42.44156253620769, -76.48364250092959]],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "orange", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_e61de2fe9c63476eb71716737a46a7e0);
+        
+    
+            poly_line_936b402433ab3d10d5b03487fb6ea80f.bindTooltip(
+                `<div>
+                     Driver 4 - BRYANT AVE
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_e61de2fe9c63476eb71716737a46a7e0.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_81eb1eebba7543bdbbfad4788bc2c935 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_a011ed1913a580898417fcebead253d4 = L.polyline(
+                [[42.456237619968554, -76.48604092331627], [42.45627998376455, -76.48624444162719], [42.45631009455565, -76.48635996686816], [42.45631422752944, -76.48637987877555]],
+                {"bubblingMouseEvents": true, "color": "darkred", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkred", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_81eb1eebba7543bdbbfad4788bc2c935);
+        
+    
+            poly_line_a011ed1913a580898417fcebead253d4.bindTooltip(
+                `<div>
+                     Driver 5 - WYCKOFF AVE
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_262be6ea78eff045ae5cd4aebe7efd15 = L.polyline(
+                [[42.456237619968554, -76.48604092331627], [42.45627998376455, -76.48624444162719], [42.45631009455565, -76.48635996686816], [42.45631422752944, -76.48637987877555]],
+                {"bubblingMouseEvents": true, "color": "darkred", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkred", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_81eb1eebba7543bdbbfad4788bc2c935);
+        
+    
+            poly_line_262be6ea78eff045ae5cd4aebe7efd15.bindTooltip(
+                `<div>
+                     Driver 5 - WYCKOFF AVE
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_81eb1eebba7543bdbbfad4788bc2c935.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_0f8dd61f2e8b2a35d44dba7b95d32998 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_709a842ceccf53a20aa75af5e6cb937f = L.polyline(
+                [[42.4507263953605, -76.49746049796927], [42.450847574622586, -76.49746888356603], [42.45133728906795, -76.49749990053265]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_709a842ceccf53a20aa75af5e6cb937f.bindTooltip(
+                `<div>
+                     Driver 6 - N TIOGA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_2c2edf1e2b698994de65bf15af86e1d5 = L.polyline(
+                [[42.45133728906795, -76.49749990053265], [42.45133793280692, -76.49749994098738], [42.4519679039881, -76.49753984102499], [42.45206223735643, -76.49754573368328]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_2c2edf1e2b698994de65bf15af86e1d5.bindTooltip(
+                `<div>
+                     Driver 6 - N TIOGA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_5176ba39ed76563f187c0055839d0dd2 = L.polyline(
+                [[42.45206225245032, -76.49754545161856], [42.45206223735643, -76.49754573368328], [42.45205615976921, -76.49767612903226], [42.45202536006221, -76.49865299145576]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_5176ba39ed76563f187c0055839d0dd2.bindTooltip(
+                `<div>
+                     Driver 6 - E LINCOLN ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_5f36a754800fe4509ae9907cb0c98995 = L.polyline(
+                [[42.45206225245032, -76.49754545161856], [42.45206223735643, -76.49754573368328], [42.45205615976921, -76.49767612903226], [42.45202536006221, -76.49865299145576]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_5f36a754800fe4509ae9907cb0c98995.bindTooltip(
+                `<div>
+                     Driver 6 - E LINCOLN ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_9b16f5189760ffaa24305ba19970e913 = L.polyline(
+                [[42.452109527761166, -76.49634856587322], [42.45210198860624, -76.4965836432365], [42.45209557560206, -76.49672144896427], [42.45207424839919, -76.49732500918898], [42.45206225245032, -76.49754545161856]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_9b16f5189760ffaa24305ba19970e913.bindTooltip(
+                `<div>
+                     Driver 6 - E LINCOLN ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_c72874093723b11966654e065e14b687 = L.polyline(
+                [[42.452169460274625, -76.49461833119287], [42.45215350964088, -76.49512324629416], [42.45215350612392, -76.4951233557129], [42.452109527761166, -76.49634856587322]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_c72874093723b11966654e065e14b687.bindTooltip(
+                `<div>
+                     Driver 6 - E LINCOLN ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_287096dced18b23dec51cb9ec01f6caf = L.polyline(
+                [[42.45103090966096, -76.4940358911818], [42.45102448065938, -76.49423139258704], [42.451034506075395, -76.49429133974114], [42.45108247139701, -76.49441140979944], [42.45115553075099, -76.49449936618157], [42.45122849527955, -76.49454633951231], [42.45147753624982, -76.49457135328483], [42.45216884984462, -76.49461828950447]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_287096dced18b23dec51cb9ec01f6caf.bindTooltip(
+                `<div>
+                     Driver 6 - LAKE ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ee03ccb6fc8cd52214abf67f927a1aa8 = L.polyline(
+                [[42.45103090966096, -76.4940358911818], [42.45102448065938, -76.49423139258704], [42.451034506075395, -76.49429133974114], [42.45108247139701, -76.49441140979944], [42.45115553075099, -76.49449936618157], [42.45122849527955, -76.49454633951231], [42.45147753624982, -76.49457135328483], [42.45216884984462, -76.49461828950447]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_ee03ccb6fc8cd52214abf67f927a1aa8.bindTooltip(
+                `<div>
+                     Driver 6 - LAKE ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_2c721aee74f7a04360c01d91fbd4afbb = L.polyline(
+                [[42.45216884984462, -76.49461828950447], [42.452169460274625, -76.49461833119287], [42.4528974694863, -76.49466738552398], [42.453122631981394, -76.49467500785384]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_2c721aee74f7a04360c01d91fbd4afbb.bindTooltip(
+                `<div>
+                     Driver 6 - LAKE ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_d7a02945c9a24fcb62129af8abbeb345 = L.polyline(
+                [[42.453122631981394, -76.49467500785384], [42.45322351138083, -76.49467842280173], [42.45337521284652, -76.4946872915933]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_d7a02945c9a24fcb62129af8abbeb345.bindTooltip(
+                `<div>
+                     Driver 6 - LAKE ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_369ad1e94595f62764cee1da8e3c542a = L.polyline(
+                [[42.453122631981394, -76.49467500785384], [42.45322351138083, -76.49467842280173], [42.45337521284652, -76.4946872915933]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_369ad1e94595f62764cee1da8e3c542a.bindTooltip(
+                `<div>
+                     Driver 6 - LAKE ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_4aedb41d77a83114d0202025f7628e73 = L.polyline(
+                [[42.45216884984462, -76.49461828950447], [42.452169460274625, -76.49461833119287], [42.4528974694863, -76.49466738552398], [42.453122631981394, -76.49467500785384]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_4aedb41d77a83114d0202025f7628e73.bindTooltip(
+                `<div>
+                     Driver 6 - LAKE ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_47b17224012dd0a92a24dfcf6d8bbddc = L.polyline(
+                [[42.452169460274625, -76.49461833119287], [42.45215350964088, -76.49512324629416], [42.45215350612392, -76.4951233557129], [42.452109527761166, -76.49634856587322]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_47b17224012dd0a92a24dfcf6d8bbddc.bindTooltip(
+                `<div>
+                     Driver 6 - E LINCOLN ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_819d2d3e3d7ea7bc70e66b9306f294b4 = L.polyline(
+                [[42.451386899789696, -76.49629895882588], [42.45152020271696, -76.49630769505833], [42.452109527761166, -76.49634856587322]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_819d2d3e3d7ea7bc70e66b9306f294b4.bindTooltip(
+                `<div>
+                     Driver 6 - N AURORA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_3edd405eec2b2f2036352dfb645a6ff3 = L.polyline(
+                [[42.451386899789696, -76.49629895882588], [42.45152020271696, -76.49630769505833], [42.452109527761166, -76.49634856587322]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_3edd405eec2b2f2036352dfb645a6ff3.bindTooltip(
+                `<div>
+                     Driver 6 - N AURORA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_b32596493a74e4c08b70a2608ceb5688 = L.polyline(
+                [[42.452109527761166, -76.49634856587322], [42.45210198860624, -76.4965836432365], [42.45209557560206, -76.49672144896427], [42.45207424839919, -76.49732500918898], [42.45206225245032, -76.49754545161856]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_b32596493a74e4c08b70a2608ceb5688.bindTooltip(
+                `<div>
+                     Driver 6 - E LINCOLN ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_405e111b3acb201d0aa20b54a0669b81 = L.polyline(
+                [[42.45133728906795, -76.49749990053265], [42.45133793280692, -76.49749994098738], [42.4519679039881, -76.49753984102499], [42.45206223735643, -76.49754573368328]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_405e111b3acb201d0aa20b54a0669b81.bindTooltip(
+                `<div>
+                     Driver 6 - N TIOGA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_731cc7b74e6bba3f7867d077365ed081 = L.polyline(
+                [[42.4507263953605, -76.49746049796927], [42.450847574622586, -76.49746888356603], [42.45133728906795, -76.49749990053265]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_731cc7b74e6bba3f7867d077365ed081.bindTooltip(
+                `<div>
+                     Driver 6 - N TIOGA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_17dd284a43c82e5c48f1733d14d8fb5e = L.polyline(
+                [[42.450279584725614, -76.49742769429137], [42.4502898085747, -76.49743027578351], [42.4507261423651, -76.49746048007958], [42.4507263953605, -76.49746049796927]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_17dd284a43c82e5c48f1733d14d8fb5e.bindTooltip(
+                `<div>
+                     Driver 6 - N TIOGA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_c68133cb11472505455341aa3da4d80b = L.polyline(
+                [[42.450279584725614, -76.49742769429137], [42.4502898085747, -76.49743027578351], [42.4507261423651, -76.49746048007958], [42.4507263953605, -76.49746049796927]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_c68133cb11472505455341aa3da4d80b.bindTooltip(
+                `<div>
+                     Driver 6 - N TIOGA ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_4b7d59d8184320baa819e17b24515b1d = L.polyline(
+                [[42.4507261423651, -76.49746048007958], [42.45069993803888, -76.49843040580214], [42.450698316370655, -76.49855414974932]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_4b7d59d8184320baa819e17b24515b1d.bindTooltip(
+                `<div>
+                     Driver 6 - E JAY ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_ce5e93b35345a366a2229a6fdea3c851 = L.polyline(
+                [[42.4507261423651, -76.49746048007958], [42.45069993803888, -76.49843040580214], [42.450698316370655, -76.49855414974932]],
+                {"bubblingMouseEvents": true, "color": "lightblue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "lightblue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_0f8dd61f2e8b2a35d44dba7b95d32998);
+        
+    
+            poly_line_ce5e93b35345a366a2229a6fdea3c851.bindTooltip(
+                `<div>
+                     Driver 6 - E JAY ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_0f8dd61f2e8b2a35d44dba7b95d32998.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var feature_group_170e69db3d34edaf4572625635d89104 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var poly_line_67e5378114565daed8597ad3766f5423 = L.polyline(
+                [[42.45086854533332, -76.50407271079449], [42.451353114961606, -76.50355901261062], [42.45144462709358, -76.50345583953403], [42.45155446771026, -76.50331975578254]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_67e5378114565daed8597ad3766f5423.bindTooltip(
+                `<div>
+                     Driver 7 - N MEADOW ST NB
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_e3df008f779df07749556e1e767d1be3 = L.polyline(
+                [[42.45460015208307, -76.50077682591409], [42.454654668085496, -76.50074525646326], [42.45475444418391, -76.50068838221954], [42.45499719284102, -76.50057044758127]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_e3df008f779df07749556e1e767d1be3.bindTooltip(
+                `<div>
+                     Driver 7 - NYS RTE 13 N
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_8899801707073064142d4fc3d5a09b08 = L.polyline(
+                [[42.45460015208307, -76.50077682591409], [42.454654668085496, -76.50074525646326], [42.45475444418391, -76.50068838221954], [42.45499719284102, -76.50057044758127]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_8899801707073064142d4fc3d5a09b08.bindTooltip(
+                `<div>
+                     Driver 7 - NYS RTE 13 N
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_4bd7d6da234c95e8181e360356c1f981 = L.polyline(
+                [[42.45460015208307, -76.50077682591409], [42.454654668085496, -76.50074525646326], [42.45475444418391, -76.50068838221954], [42.45499719284102, -76.50057044758127]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_4bd7d6da234c95e8181e360356c1f981.bindTooltip(
+                `<div>
+                     Driver 7 - NYS RTE 13 N
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_c54da53034fd1e0f14b538b9401b5d3e = L.polyline(
+                [[42.45086854533332, -76.50407271079449], [42.451353114961606, -76.50355901261062], [42.45144462709358, -76.50345583953403], [42.45155446771026, -76.50331975578254]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_c54da53034fd1e0f14b538b9401b5d3e.bindTooltip(
+                `<div>
+                     Driver 7 - N MEADOW ST NB
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_34cf1db122ba9b6ad91449cc2524e551 = L.polyline(
+                [[42.45062128145096, -76.50434977323927], [42.45086854533332, -76.50407271079449]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_34cf1db122ba9b6ad91449cc2524e551.bindTooltip(
+                `<div>
+                     Driver 7 - N MEADOW ST NB
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_aefde7da189c032532cff2ce58c2d5ea = L.polyline(
+                [[42.451149455077854, -76.5029501921572], [42.45125207116479, -76.50302972767005], [42.45135452310814, -76.50311922140057], [42.45146143282696, -76.50320685823586], [42.45152339712903, -76.50328019399352], [42.45155446771026, -76.50331975578254]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_aefde7da189c032532cff2ce58c2d5ea.bindTooltip(
+                `<div>
+                     Driver 7 - DEY ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_8baec29b25855a455facdb36c0eb41ec = L.polyline(
+                [[42.451149455077854, -76.5029501921572], [42.45125207116479, -76.50302972767005], [42.45135452310814, -76.50311922140057], [42.45146143282696, -76.50320685823586], [42.45152339712903, -76.50328019399352], [42.45155446771026, -76.50331975578254]],
+                {"bubblingMouseEvents": true, "color": "darkgreen", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "darkgreen", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_170e69db3d34edaf4572625635d89104);
+        
+    
+            poly_line_8baec29b25855a455facdb36c0eb41ec.bindTooltip(
+                `<div>
+                     Driver 7 - DEY ST
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_170e69db3d34edaf4572625635d89104.addTo(map_687efe2796f4e8bf3015d01e453153fd);
+        
+    
+            var layer_control_20c766f0b625e94c0c76978519f8c9b2_layers = {
+                base_layers : {
+                    "openstreetmap" : tile_layer_ce94ebed8fc96a5213775be00d2f90d0,
+                },
+                overlays :  {
+                    "Driver 0" : feature_group_e37bb7258360ebcd4407a5254a2a8383,
+                    "Driver 1" : feature_group_f53f604e7f8968a2f4942beb76f25fa5,
+                    "Driver 2" : feature_group_22349f3afcbc422236f6f4c89e40b9a2,
+                    "Driver 3" : feature_group_d08d6722500a26ea2d10f52a925a900f,
+                    "Driver 4" : feature_group_e61de2fe9c63476eb71716737a46a7e0,
+                    "Driver 5" : feature_group_81eb1eebba7543bdbbfad4788bc2c935,
+                    "Driver 6" : feature_group_0f8dd61f2e8b2a35d44dba7b95d32998,
+                    "Driver 7" : feature_group_170e69db3d34edaf4572625635d89104,
+                },
+            };
+            let layer_control_20c766f0b625e94c0c76978519f8c9b2 = L.control.layers(
+                layer_control_20c766f0b625e94c0c76978519f8c9b2_layers.base_layers,
+                layer_control_20c766f0b625e94c0c76978519f8c9b2_layers.overlays,
+                {
+  "position": "topright",
+  "collapsed": false,
+  "autoZIndex": true,
+}
+            ).addTo(map_687efe2796f4e8bf3015d01e453153fd);
+
+        
+</script>
+</html>
