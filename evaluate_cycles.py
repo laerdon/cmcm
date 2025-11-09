@@ -37,51 +37,89 @@ def calculate_cost_without_plow(edge_priority, snowfall_rate, time_duration):
     return cost
 
 
-def calculate_cost_with_plow(G, cycle, snowfall_rate, start_time=0):
+def calculate_cost_with_plow(G, cycle, snowfall_rate, storm_duration, start_time=0):
     """
-    calculate cost accumulated if plow follows the cycle.
+    calculate cost accumulated if plow follows the cycle repeatedly over the storm duration.
     for each edge, snow accumulates from last visit (or start) until plow arrives.
+    the cycle repeats as many times as possible within the storm duration.
 
     args:
         G: networkx graph
         cycle: list of (from_node, to_node, edge_key) tuples
         snowfall_rate: inches per minute
+        storm_duration: total storm duration in minutes
         start_time: when plow starts (minutes from storm start)
 
     returns:
-        total cost
+        tuple of (total_cost, num_complete_cycles, edges_visited_set)
     """
+    if not cycle:
+        return 0.0, 0, set()
+
     # track last visit time for each edge
     edge_last_visit = {}
     current_time = start_time
     total_cost = 0.0
+    num_complete_cycles = 0
+    edges_visited = set()
 
-    for from_node, to_node, edge_key in cycle:
+    # repeat cycle until storm ends
+    while current_time < storm_duration:
+        cycle_start_time = current_time
+
+        for from_node, to_node, edge_key in cycle:
+            edge_data = G[from_node][to_node][edge_key]
+            edge_id = (from_node, to_node, edge_key)
+            edges_visited.add(edge_id)
+
+            # check if we'd exceed storm duration
+            if current_time >= storm_duration:
+                break
+
+            # calculate cost since last visit (or start)
+            last_visit = edge_last_visit.get(edge_id, start_time)
+            time_since_visit = current_time - last_visit
+
+            # snow accumulated = snowfall_rate * time_since_visit
+            # cost = priority * integral(snowfall_rate * t dt from 0 to time_since_visit)
+            #      = priority * snowfall_rate * time_since_visit^2 / 2
+            cost = edge_data["priority"] * snowfall_rate * (time_since_visit**2) / 2.0
+            total_cost += cost
+
+            # update last visit time
+            edge_last_visit[edge_id] = current_time
+
+            # advance time by travel time
+            current_time += edge_data["travel_time"]
+
+        # check if we completed the full cycle
+        if current_time <= storm_duration:
+            num_complete_cycles += 1
+
+        # if cycle takes 0 time (shouldn't happen), break to avoid infinite loop
+        if current_time == cycle_start_time:
+            break
+
+    # add residual cost for edges not visited again before storm ends
+    for edge_id, last_visit in edge_last_visit.items():
+        from_node, to_node, edge_key = edge_id
         edge_data = G[from_node][to_node][edge_key]
-        edge_id = (from_node, to_node, edge_key)
 
-        # calculate cost since last visit (or start)
-        last_visit = edge_last_visit.get(edge_id, start_time)
-        time_since_visit = current_time - last_visit
+        # time from last visit to end of storm
+        time_since_visit = storm_duration - last_visit
 
-        # snow accumulated = snowfall_rate * time_since_visit
-        # cost = priority * integral(snowfall_rate * t dt from 0 to time_since_visit)
-        #      = priority * snowfall_rate * time_since_visit^2 / 2
-        cost = edge_data["priority"] * snowfall_rate * (time_since_visit**2) / 2.0
-        total_cost += cost
+        if time_since_visit > 0:
+            # cost for snow accumulating after last visit
+            cost = edge_data["priority"] * snowfall_rate * (time_since_visit**2) / 2.0
+            total_cost += cost
 
-        # update last visit time
-        edge_last_visit[edge_id] = current_time
-
-        # advance time by travel time
-        current_time += edge_data["travel_time"]
-
-    return total_cost
+    return total_cost, num_complete_cycles, edges_visited
 
 
 def calculate_cycle_benefit(G, cycle, snowfall_rate, storm_duration):
     """
-    calculate benefit of using this cycle vs not plowing.
+    calculate benefit of using this cycle vs not plowing over the full storm duration.
+    simulates repeated passes of the cycle throughout the storm.
 
     benefit = cost_without_plow - cost_with_plow
 
@@ -100,6 +138,9 @@ def calculate_cycle_benefit(G, cycle, snowfall_rate, storm_duration):
             "cost_with_plow": 0.0,
             "benefit": 0.0,
             "benefit_per_minute": 0.0,
+            "cycle_time": 0.0,
+            "num_complete_cycles": 0,
+            "coverage_ratio": 0.0,
         }
 
     # calculate total priority of edges in cycle
@@ -118,17 +159,23 @@ def calculate_cycle_benefit(G, cycle, snowfall_rate, storm_duration):
         total_priority, snowfall_rate, storm_duration
     )
 
-    # cost with plow: follow the cycle
-    cost_with_plow = calculate_cost_with_plow(G, cycle, snowfall_rate, start_time=0)
+    # cost with plow: follow the cycle repeatedly over storm duration
+    cost_with_plow, num_complete_cycles, edges_visited = calculate_cost_with_plow(
+        G, cycle, snowfall_rate, storm_duration, start_time=0
+    )
 
     # benefit
     benefit = cost_without_plow - cost_with_plow
 
-    # calculate cycle time
+    # calculate cycle time (single pass)
     cycle_time = sum(G[u][v][k]["travel_time"] for u, v, k in cycle)
 
-    # benefit per minute
-    benefit_per_minute = benefit / cycle_time if cycle_time > 0 else 0.0
+    # benefit per minute of storm duration
+    benefit_per_minute = benefit / storm_duration if storm_duration > 0 else 0.0
+
+    # coverage ratio: what fraction of partition edges are covered
+    # (this will be filled in later if we have partition context)
+    coverage_ratio = len(edges_visited) / len(unique_edges) if unique_edges else 0.0
 
     return {
         "cost_without_plow": float(cost_without_plow),
@@ -136,6 +183,8 @@ def calculate_cycle_benefit(G, cycle, snowfall_rate, storm_duration):
         "benefit": float(benefit),
         "benefit_per_minute": float(benefit_per_minute),
         "cycle_time": float(cycle_time),
+        "num_complete_cycles": int(num_complete_cycles),
+        "coverage_ratio": float(coverage_ratio),
     }
 
 
@@ -246,10 +295,12 @@ def main():
                 "method": cycle_data["method"],
                 "start_node": cycle_data["start_node"],
                 "cycle_time": cycle_data["evaluation"]["cycle_time"],
+                "num_complete_cycles": cycle_data["evaluation"]["num_complete_cycles"],
                 "benefit": cycle_data["evaluation"]["benefit"],
                 "benefit_per_minute": cycle_data["evaluation"]["benefit_per_minute"],
                 "cost_without_plow": cycle_data["evaluation"]["cost_without_plow"],
                 "cost_with_plow": cycle_data["evaluation"]["cost_with_plow"],
+                "coverage_ratio": cycle_data["evaluation"]["coverage_ratio"],
                 "total_priority": cycle_data["metrics"]["total_priority"],
                 "unique_edges": cycle_data["metrics"]["unique_edges"],
             }
@@ -265,6 +316,10 @@ def main():
     print(f"average benefit: {summary_df['benefit'].mean():.2f}")
     print(f"average benefit per minute: {summary_df['benefit_per_minute'].mean():.4f}")
     print(f"best benefit per minute: {summary_df['benefit_per_minute'].max():.4f}")
+    print(
+        f"average cycles completed in {STORM_DURATION_HOURS}h: {summary_df['num_complete_cycles'].mean():.1f}"
+    )
+    print(f"average coverage ratio: {summary_df['coverage_ratio'].mean():.2%}")
 
     # show top cycles per partition
     print("\n[INFO] top cycle per partition:")
@@ -272,7 +327,11 @@ def main():
         ps_id, p_id = key
         top_cycle = ranked_partitions[key][0]
         print(
-            f"  partition set {ps_id}, partition {p_id}: benefit/min = {top_cycle['evaluation']['benefit_per_minute']:.4f}, method = {top_cycle['method']}"
+            f"  partition set {ps_id}, partition {p_id}: "
+            f"benefit/min = {top_cycle['evaluation']['benefit_per_minute']:.4f}, "
+            f"cycles completed = {top_cycle['evaluation']['num_complete_cycles']}, "
+            f"coverage = {top_cycle['evaluation']['coverage_ratio']:.1%}, "
+            f"method = {top_cycle['method']}"
         )
 
     return evaluated_cycles

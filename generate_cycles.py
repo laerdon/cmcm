@@ -12,7 +12,7 @@ from collections import defaultdict
 import random
 
 
-MAX_CYCLE_TIME_MINUTES = 720  # 12 hours max per cycle
+MAX_CYCLE_TIME_MINUTES = 120  # 2 hours max per cycle
 
 
 def greedy_cycle(G, start_node, max_time=MAX_CYCLE_TIME_MINUTES):
