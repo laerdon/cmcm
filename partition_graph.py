@@ -213,6 +213,8 @@ def analyze_partitions(G, partitions):
     return stats
 
 
+
+
 def main():
     print("[INFO] loading road graph...")
     with open("road_graph.gpickle", "rb") as f:
@@ -292,3 +294,102 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# # Graph Visualization
+# import networkx as nx
+# import matplotlib.pyplot as plt
+# import json
+# import pickle
+# import numpy as np
+# from matplotlib.patches import Polygon, Patch
+# from scipy.spatial import ConvexHull
+
+# # Load the saved graph and partition data
+# with open("road_graph.gpickle", "rb") as f:
+#     G = pickle.load(f)
+
+# with open("partitions.json", "r") as f:
+#     partition_sets = json.load(f)
+
+# # Pick the first partition set to visualize
+# partitions = partition_sets[0]
+
+# # Map node → partition index
+# node_to_partition = {}
+# for i, partition in enumerate(partitions):
+#     for node in partition:
+#         node_to_partition[node] = i
+
+# # Choose a color palette (adjust as needed)
+# num_partitions = len(partitions)
+# colors = plt.cm.get_cmap("tab10", num_partitions)
+
+# # Use node coordinates if available; otherwise, use a layout
+# if "x" in list(G.nodes(data=True))[0][1]:
+#     pos = {n: (d["x"], d["y"]) for n, d in G.nodes(data=True)}
+# else:
+#     pos = nx.spring_layout(G, seed=42)
+
+# # Create figure and axis
+# plt.figure(figsize=(10, 10))
+# ax = plt.gca()
+
+# # 1️⃣ Draw faint gray edges (no arrows)
+# nx.draw_networkx_edges(
+#     G, pos, edge_color="lightgray", alpha=0.6, width=0.8, arrows=False
+# )
+
+# # 2️⃣ Draw rigid shaded polygons for each partition
+# legend_handles = []
+# for i, partition in enumerate(partitions):
+#     color = np.array(colors(i))  # RGBA
+#     points = np.array([pos[n] for n in partition if n in pos])
+
+#     if len(points) >= 3:  # Need at least 3 points for a hull
+#         try:
+#             hull = ConvexHull(points)
+#             polygon = Polygon(
+#                 points[hull.vertices],
+#                 closed=True,
+#                 facecolor=color,
+#                 alpha=0.15,  # Shading transparency
+#                 edgecolor="none",
+#             )
+#             ax.add_patch(polygon)
+
+#             # Add this zone to the legend
+#             legend_handles.append(
+#                 Patch(facecolor=color, edgecolor=color, label=f"Zone {i + 1}")
+#             )
+
+#         except Exception as e:
+#             print(f"Warning: Convex hull failed for zone {i + 1}: {e}")
+
+# # 3️⃣ Draw nodes (colored by partition)
+# nx.draw_networkx_nodes(
+#     G,
+#     pos,
+#     node_color=[colors(node_to_partition[n]) for n in G.nodes()],
+#     node_size=15,
+#     alpha=0.9,
+# )
+
+# # 4️⃣ Add legend on the right side
+# ax.legend(
+#     handles=legend_handles,
+#     title="Zones",
+#     loc="center left",
+#     bbox_to_anchor=(1.05, 0.5),
+#     frameon=False,
+# )
+
+# # 5️⃣ Styling and output
+# plt.title("Graph Partitioning of Ithaca into 8 Zones", fontsize=14)
+# plt.axis("off")
+# plt.tight_layout()
+# plt.savefig(
+#     "partition_visualization_shaded_with_legend.png",
+#     dpi=300,
+#     bbox_inches="tight"
+# )
+# plt.show()
