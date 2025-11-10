@@ -1,761 +1,643 @@
 #!/usr/bin/env python3
 """
-Partition road graph into 8 spatially-clustered subgraphs with balanced priority.
-Combines spectral partitioning for clustering with priority-aware refinement.
+partition road graph into 8 subgraphs using growing contiguous partitions.
+optimizes for both travel time compactness and priority balance.
+supports parallel generation of multiple partition sets using multiprocessing.
 """
-
 
 import networkx as nx
 import numpy as np
 import json
 import pickle
-import pandas as pd
 from collections import defaultdict
-
-
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing as mp
 
 
 def calculate_partition_priority(G, nodes):
-   """Calculate total edge priority within a partition."""
-   total_priority = 0.0
-   nodes_set = set(nodes)
-   for u, v, data in G.edges(data=True):
-       if u in nodes_set and v in nodes_set:
-           total_priority += data["priority"]
-   return total_priority
+    """
+    calculate total priority for a set of nodes in the graph.
+
+    args:
+        G: networkx graph
+        nodes: set of node ids
+
+    returns:
+        total priority
+    """
+    total_priority = 0.0
+    for u, v, data in G.edges(data=True):
+        if u in nodes and v in nodes:
+            total_priority += data["priority"]
+    return total_priority
 
 
+def calculate_avg_pairwise_travel_time(G, nodes, sample_size=50):
+    """
+    estimate average pairwise shortest path travel time within a partition.
+    uses sampling for efficiency with large partitions.
+
+    args:
+        G: networkx graph
+        nodes: set of nodes in partition
+        sample_size: number of pairs to sample for estimation
+
+    returns:
+        average pairwise travel time (minutes)
+    """
+    if len(nodes) < 2:
+        return 0.0
+
+    nodes_list = list(nodes)
+    subgraph = G.subgraph(nodes_list)
+
+    # for small partitions, compute all pairs
+    if len(nodes_list) <= 10:
+        total_time = 0.0
+        count = 0
+        for i, u in enumerate(nodes_list):
+            for v in nodes_list[i + 1 :]:
+                try:
+                    path_length = nx.shortest_path_length(
+                        subgraph, u, v, weight="travel_time"
+                    )
+                    total_time += path_length
+                    count += 1
+                except nx.NetworkXNoPath:
+                    # nodes not connected within partition
+                    total_time += 1000.0  # penalty for disconnection
+                    count += 1
+        return total_time / count if count > 0 else 0.0
+
+    # for large partitions, sample random pairs
+    total_time = 0.0
+    for _ in range(sample_size):
+        u, v = np.random.choice(nodes_list, 2, replace=False)
+        try:
+            path_length = nx.shortest_path_length(subgraph, u, v, weight="travel_time")
+            total_time += path_length
+        except nx.NetworkXNoPath:
+            total_time += 1000.0  # penalty for disconnection
+
+    return total_time / sample_size
 
 
-def spectral_partition_balanced(G, nodes, node_priorities, rng):
-   """
-   Partition nodes using spectral clustering with priority-aware split point.
-  
-   Args:
-       G: networkx graph
-       nodes: set of nodes to partition
-       node_priorities: dict mapping node to its total incident edge priority
-       rng: numpy random generator for reproducible randomness
-  
-   Returns:
-       tuple of (partition1, partition2) as sets of nodes
-   """
-   if len(nodes) <= 2:
-       nodes_list = list(nodes)
-       rng.shuffle(nodes_list)
-       return {nodes_list[0]}, set(nodes_list[1:]) if len(nodes) > 1 else set()
+def select_seed_nodes(G, num_seeds=8, method="priority_weighted", random_seed=None):
+    """
+    select seed nodes for growing partitions.
+
+    args:
+        G: networkx graph
+        num_seeds: number of seeds to select
+        method: 'random', 'geographic', or 'priority_weighted'
+        random_seed: random seed for reproducibility
+
+    returns:
+        list of seed node ids
+    """
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
+    all_nodes = list(G.nodes())
+
+    if method == "random":
+        # pure random selection
+        return list(np.random.choice(all_nodes, num_seeds, replace=False))
+
+    elif method == "geographic":
+        # spread seeds geographically using k-means-style initialization
+        # get node positions
+        positions = np.array([[G.nodes[n]["x"], G.nodes[n]["y"]] for n in all_nodes])
+
+        # simple k-means++ style initialization
+        seeds = []
+        first_seed = np.random.choice(all_nodes)
+        seeds.append(first_seed)
+
+        for _ in range(num_seeds - 1):
+            # find node farthest from existing seeds
+            max_min_dist = -1
+            best_node = None
+            for node_idx, node in enumerate(all_nodes):
+                if node in seeds:
+                    continue
+                # compute min distance to existing seeds
+                min_dist = float("inf")
+                for seed in seeds:
+                    seed_idx = all_nodes.index(seed)
+                    dist = np.linalg.norm(positions[node_idx] - positions[seed_idx])
+                    min_dist = min(min_dist, dist)
+                if min_dist > max_min_dist:
+                    max_min_dist = min_dist
+                    best_node = node
+            seeds.append(best_node)
+
+        return seeds
+
+    elif method == "priority_weighted":
+        # select seeds weighted by local priority (nodes in high-priority areas)
+        # calculate node importance as sum of adjacent edge priorities
+        node_importance = {}
+        for node in all_nodes:
+            importance = 0.0
+            for neighbor in G.neighbors(node):
+                for edge_key in G[node][neighbor]:
+                    importance += G[node][neighbor][edge_key]["priority"]
+            node_importance[node] = importance
+
+        # normalize to probabilities
+        total_importance = sum(node_importance.values())
+        if total_importance > 0:
+            probs = np.array([node_importance[n] for n in all_nodes])
+            probs = probs / probs.sum()
+        else:
+            probs = np.ones(len(all_nodes)) / len(all_nodes)
+
+        # add some randomness - mix with uniform distribution
+        probs = 0.7 * probs + 0.3 * np.ones(len(all_nodes)) / len(all_nodes)
+        probs = probs / probs.sum()
+
+        return list(np.random.choice(all_nodes, num_seeds, replace=False, p=probs))
 
 
-   try:
-       # Create a proper copy of the subgraph (not a view)
-       subgraph = G.subgraph(nodes).copy()
-      
-       # Convert to undirected - this creates a new graph, not a view
-       G_undirected = nx.Graph()
-       G_undirected.add_nodes_from(subgraph.nodes())
-      
-       # Add edges with random perturbation for diversity
-       for u, v in subgraph.edges():
-           weight = 1.0 + rng.uniform(-0.1, 0.1)
-           # Add edge in both directions (undirected)
-           if G_undirected.has_edge(u, v):
-               G_undirected[u][v]['weight'] = (G_undirected[u][v]['weight'] + weight) / 2
-           else:
-               G_undirected.add_edge(u, v, weight=weight)
-      
-       # Ensure graph is connected, otherwise spectral won't work well
-       if not nx.is_connected(G_undirected):
-           # Find largest connected component
-           largest_cc = max(nx.connected_components(G_undirected), key=len)
-           remaining = set(nodes) - largest_cc
-          
-           if len(remaining) > 0 and len(largest_cc) > 0:
-               # Put smaller components in one partition
-               return largest_cc, remaining
-      
-       # Compute Laplacian and Fiedler vector
-       laplacian = nx.laplacian_matrix(G_undirected, weight='weight').todense()
-       eigenvalues, eigenvectors = np.linalg.eigh(laplacian)
-      
-       # Second smallest eigenvalue's eigenvector (Fiedler vector)
-       fiedler_vector = eigenvectors[:, 1]
-      
-       # Sort nodes by Fiedler vector value
-       nodes_array = np.array(list(G_undirected.nodes()))
-       sorted_indices = np.argsort(fiedler_vector)
-       sorted_nodes = nodes_array[sorted_indices]
-      
-       # Find split point that balances priority (not just node count)
-       total_priority = sum(node_priorities.get(n, 0) for n in sorted_nodes)
-       target_priority = total_priority / 2
-      
-       cumulative_priority = 0
-       best_split = len(sorted_nodes) // 2
-       best_diff = float('inf')
-      
-       for i in range(1, len(sorted_nodes)):
-           cumulative_priority += node_priorities.get(sorted_nodes[i-1], 0)
-           diff = abs(cumulative_priority - target_priority)
-           if diff < best_diff:
-               best_diff = diff
-               best_split = i
-      
-       partition1 = set(sorted_nodes[:best_split])
-       partition2 = set(sorted_nodes[best_split:])
-      
-       # Ensure both partitions are non-empty
-       if len(partition1) == 0 or len(partition2) == 0:
-           mid = len(sorted_nodes) // 2
-           partition1 = set(sorted_nodes[:mid])
-           partition2 = set(sorted_nodes[mid:])
-      
-       return partition1, partition2
-      
-   except Exception as e:
-       print(f"[WARNING] Spectral partitioning failed: {e}, using fallback")
-       nodes_list = list(nodes)
-       rng.shuffle(nodes_list)
-       mid = len(nodes_list) // 2
-       return set(nodes_list[:mid]), set(nodes_list[mid:])
+def grow_partitions(G, seed_nodes, alpha=0.5, max_iterations=10000, verbose=True):
+    """
+    grow partitions from seed nodes using dual objective optimization.
+
+    args:
+        G: networkx graph
+        seed_nodes: list of initial seed node ids
+        alpha: weight for compactness objective (0 to 1)
+               alpha=1: pure compactness (min travel time)
+               alpha=0: pure priority balance
+        max_iterations: maximum growth iterations
+        verbose: print progress
+
+    returns:
+        list of node sets, one per partition
+    """
+    num_partitions = len(seed_nodes)
+    partitions = [set([seed]) for seed in seed_nodes]
+    assigned = set(seed_nodes)
+    all_nodes = set(G.nodes())
+    unassigned = all_nodes - assigned
+
+    # precompute total graph priority for normalization
+    total_graph_priority = sum(data["priority"] for u, v, data in G.edges(data=True))
+    target_priority = total_graph_priority / num_partitions
+
+    iteration = 0
+    while unassigned and iteration < max_iterations:
+        if verbose and iteration % 100 == 0:
+            print(f"[INFO] iteration {iteration}, {len(unassigned)} nodes remaining")
+
+        # find all boundary nodes (unassigned nodes adjacent to assigned nodes)
+        boundary_candidates = []
+        for node in unassigned:
+            adjacent_partitions = set()
+            for neighbor in G.neighbors(node):
+                for p_idx, partition in enumerate(partitions):
+                    if neighbor in partition:
+                        adjacent_partitions.add(p_idx)
+
+            if adjacent_partitions:
+                boundary_candidates.append((node, adjacent_partitions))
+
+        if not boundary_candidates:
+            # no boundary nodes found - graph might be disconnected
+            # assign remaining nodes to nearest partition by distance
+            if verbose:
+                print(
+                    f"[WARNING] no boundary nodes found, {len(unassigned)} nodes isolated"
+                )
+            for node in list(unassigned):
+                # assign to random partition
+                p_idx = np.random.randint(num_partitions)
+                partitions[p_idx].add(node)
+            break
+
+        # evaluate cost for each candidate assignment
+        best_cost = float("inf")
+        best_assignment = None
+
+        for node, adjacent_partitions in boundary_candidates:
+            for p_idx in adjacent_partitions:
+                # compute cost of adding node to partition p_idx
+
+                # 1. compactness cost: increase in avg pairwise travel time
+                # approximate by average distance from node to partition centroid
+                test_partition = partitions[p_idx] | {node}
+
+                # simplified compactness: avg travel time from new node to existing nodes
+                if len(partitions[p_idx]) > 0:
+                    sample_nodes = list(partitions[p_idx])
+                    if len(sample_nodes) > 10:
+                        sample_nodes = list(
+                            np.random.choice(sample_nodes, 10, replace=False)
+                        )
+
+                    travel_times = []
+                    for existing_node in sample_nodes:
+                        try:
+                            tt = nx.shortest_path_length(
+                                G, node, existing_node, weight="travel_time"
+                            )
+                            travel_times.append(tt)
+                        except nx.NetworkXNoPath:
+                            travel_times.append(1000.0)  # large penalty
+
+                    compactness_cost = np.mean(travel_times)
+                else:
+                    compactness_cost = 0.0
+
+                # 2. priority balance cost: deviation from target priority
+                current_priority = calculate_partition_priority(G, partitions[p_idx])
+
+                # estimate priority contribution of adding this node
+                priority_contrib = 0.0
+                for neighbor in G.neighbors(node):
+                    if neighbor in partitions[p_idx]:
+                        for edge_key in G[node][neighbor]:
+                            priority_contrib += G[node][neighbor][edge_key]["priority"]
+
+                new_priority = current_priority + priority_contrib
+                priority_imbalance = abs(new_priority - target_priority)
+
+                # normalize costs to comparable scales
+                # compactness in minutes, priority imbalance as % of target
+                normalized_compactness = compactness_cost / 60.0  # normalize to hours
+                normalized_priority = (
+                    priority_imbalance / target_priority if target_priority > 0 else 0.0
+                )
+
+                # combined cost with weighting
+                total_cost = (
+                    alpha * normalized_compactness + (1 - alpha) * normalized_priority
+                )
+
+                if total_cost < best_cost:
+                    best_cost = total_cost
+                    best_assignment = (node, p_idx)
+
+        # make best assignment
+        if best_assignment:
+            node, p_idx = best_assignment
+            partitions[p_idx].add(node)
+            unassigned.remove(node)
+            assigned.add(node)
+        else:
+            # no valid assignment found
+            break
+
+        iteration += 1
+
+    if verbose:
+        print(f"[INFO] growing completed in {iteration} iterations")
+        print(f"[INFO] {len(unassigned)} nodes remaining unassigned")
+
+    return partitions
 
 
+def create_partition_set(
+    G, random_seed=None, alpha=0.5, seed_method="priority_weighted"
+):
+    """
+    create one set of 8 partitions using growing algorithm.
 
+    args:
+        G: networkx graph
+        random_seed: random seed for reproducibility
+        alpha: weight for compactness vs priority balance (0 to 1)
+        seed_method: method for selecting seed nodes
 
-def compute_node_priorities(G):
-   """Compute priority for each node as sum of incident edge priorities."""
-   node_priorities = defaultdict(float)
-   for u, v, data in G.edges(data=True):
-       priority = data.get("priority", 0)
-       node_priorities[u] += priority
-       node_priorities[v] += priority
-   return dict(node_priorities)
+    returns:
+        list of 8 node sets
+    """
+    if random_seed is not None:
+        np.random.seed(random_seed)
+        import random
 
+        random.seed(random_seed)
 
+    # select seed nodes
+    seed_nodes = select_seed_nodes(
+        G, num_seeds=1, method=seed_method, random_seed=random_seed
+    )
 
+    print(f"[INFO] selected seed nodes: {seed_nodes}")
+    print(f"[INFO] using alpha={alpha} (compactness weight)")
 
-def recursive_balanced_partition(G, nodes, node_priorities, target_partitions, rng):
-   """
-   Recursively partition graph using spectral clustering with priority balance.
-  
-   Args:
-       G: networkx graph
-       nodes: set of nodes to partition
-       node_priorities: dict of node priorities
-       target_partitions: number of partitions (must be power of 2)
-       rng: numpy random generator
-  
-   Returns:
-       list of node sets, one per partition
-   """
-   if target_partitions == 1:
-       return [nodes]
-  
-   if len(nodes) < target_partitions:
-       # Edge case: fewer nodes than target partitions
-       return [set([n]) for n in nodes] + [set() for _ in range(target_partitions - len(nodes))]
-  
-   # Partition into two using priority-aware spectral split
-   partition1, partition2 = spectral_partition_balanced(G, nodes, node_priorities, rng)
-  
-   # Calculate how many partitions each half should get based on priority
-   total_priority = sum(node_priorities.get(n, 0) for n in nodes)
-   priority1 = sum(node_priorities.get(n, 0) for n in partition1)
-   priority2 = sum(node_priorities.get(n, 0) for n in partition2)
-  
-   # Allocate partitions proportionally to priority (but at least 1 each)
-   if priority1 + priority2 > 0:
-       ratio1 = priority1 / (priority1 + priority2)
-       partitions_for_1 = max(1, min(target_partitions - 1, round(target_partitions * ratio1)))
-       partitions_for_2 = target_partitions - partitions_for_1
-   else:
-       # Fallback: split evenly
-       partitions_for_1 = target_partitions // 2
-       partitions_for_2 = target_partitions - partitions_for_1
-  
-   # Recursively partition each half
-   partitions1 = recursive_balanced_partition(G, partition1, node_priorities, partitions_for_1, rng)
-   partitions2 = recursive_balanced_partition(G, partition2, node_priorities, partitions_for_2, rng)
-  
-   return partitions1 + partitions2
+    # grow partitions
+    partitions = grow_partitions(
+        G, seed_nodes, alpha=alpha, max_iterations=10000, verbose=True
+    )
 
+    # convert to list of sets
+    partitions = [set(p) for p in partitions]
 
-
-
-def compute_spatial_compactness(G, partition):
-   """
-   Compute how spatially compact a partition is.
-   Lower is better (nodes are closer together).
-   """
-   if len(partition) <= 1:
-       return 0.0
-  
-   partition_list = list(partition)
-   total_distance = 0
-   count = 0
-  
-   # Sample pairs to avoid O(n^2) for large partitions
-   sample_size = min(100, len(partition_list))
-   rng_local = np.random.default_rng(42)
-   sampled = rng_local.choice(partition_list, size=sample_size, replace=False)
-  
-   for i, u in enumerate(sampled):
-       for v in sampled[i+1:]:
-           try:
-               # Use shortest path length as distance metric
-               dist = nx.shortest_path_length(G, u, v)
-               total_distance += dist
-               count += 1
-           except nx.NetworkXNoPath:
-               # If no path, assign large penalty
-               total_distance += 1000
-               count += 1
-  
-   return total_distance / count if count > 0 else 0.0
-
-
-
-
-def remove_outliers_from_partitions(G, partitions, node_priorities, max_iterations=20):
-   """
-   Aggressively remove outlier nodes from partitions and reassign them to nearest partition.
-   Prioritizes spatial clustering over individual node count balance.
-  
-   Args:
-       G: networkx graph
-       partitions: list of node sets
-       node_priorities: dict of node priorities
-       max_iterations: maximum refinement iterations
-  
-   Returns:
-       refined list of node sets
-   """
-   partitions = [set(p) for p in partitions]
-  
-   for iteration in range(max_iterations):
-       moved_any = False
-      
-       for i, partition in enumerate(partitions):
-           if len(partition) <= 2:
-               continue  # Don't break up tiny partitions
-          
-           outliers_to_move = []
-          
-           for node in list(partition):
-               # Count how many neighbors are in the same partition
-               neighbors = list(G.neighbors(node))
-               same_partition_neighbors = sum(1 for n in neighbors if n in partition)
-              
-               # Check neighbors in other partitions
-               other_partition_neighbors = defaultdict(int)
-               for neighbor in neighbors:
-                   for j, other_partition in enumerate(partitions):
-                       if j != i and neighbor in other_partition:
-                           other_partition_neighbors[j] += 1
-              
-               # If node has more connections to another partition, it's an outlier
-               if other_partition_neighbors:
-                   max_other_connections = max(other_partition_neighbors.values())
-                   if max_other_connections > same_partition_neighbors:
-                       # Find which partition it's most connected to
-                       best_partition = max(other_partition_neighbors.items(), key=lambda x: x[1])[0]
-                       outliers_to_move.append((node, best_partition))
-          
-           # Move outliers
-           for node, target_partition_idx in outliers_to_move:
-               partitions[i].remove(node)
-               partitions[target_partition_idx].add(node)
-               moved_any = True
-      
-       if not moved_any:
-           break
-  
-   return partitions
-
-
-
-
-def refine_partition_balance(G, partitions, node_priorities, max_iterations=200):
-   """
-   Refine partitions by moving boundary nodes to balance priority.
-   STRONGLY prioritizes maintaining spatial clustering.
-  
-   Args:
-       G: networkx graph
-       partitions: list of node sets
-       node_priorities: dict of node priorities
-       max_iterations: maximum refinement iterations
-  
-   Returns:
-       refined list of node sets
-   """
-   partitions = [set(p) for p in partitions]
-  
-   # Remove any empty partitions
-   partitions = [p for p in partitions if len(p) > 0]
-  
-   for iteration in range(max_iterations):
-       priorities = [calculate_partition_priority(G, p) for p in partitions]
-       mean_priority = np.mean(priorities)
-      
-       # More lenient threshold - 15% variation is acceptable
-       if np.std(priorities) / mean_priority < 0.15:
-           break
-      
-       # Find most overloaded and most underloaded partitions
-       max_idx = np.argmax(priorities)
-       min_idx = np.argmin(priorities)
-      
-       if priorities[max_idx] - priorities[min_idx] < mean_priority * 0.05:
-           break
-      
-       # Find boundary nodes: nodes with neighbors in other partitions
-       # BUT only consider nodes that have MINORITY connections in current partition
-       candidate_moves = []
-      
-       for i, partition in enumerate(partitions):
-           if len(partition) == 0:
-               continue
-              
-           # Consider moving from overloaded partitions OR partitions significantly above mean
-           if priorities[i] < mean_priority * 0.9:
-               continue
-          
-           for node in list(partition):
-               # Count connections
-               neighbors = list(G.neighbors(node))
-               if len(neighbors) == 0:
-                   continue
-                  
-               same_partition_neighbors = sum(1 for n in neighbors if n in partition)
-              
-               # Only move if node has weak connection to current partition
-               if same_partition_neighbors <= len(neighbors) / 2:
-                   node_priority = node_priorities.get(node, 0)
-                  
-                   # Find best target partition (must have actual connection)
-                   for j, other_partition in enumerate(partitions):
-                       if i == j or len(other_partition) == 0:
-                           continue
-                          
-                       # Prioritize moving to underloaded partitions
-                       if priorities[j] < mean_priority * 1.1:
-                           connection_count = sum(1 for n in neighbors if n in other_partition)
-                           if connection_count > 0:  # Must have actual neighbors
-                               # Calculate benefit: how much this improves balance
-                               balance_benefit = (priorities[i] - priorities[j]) / 2
-                               # Weight by connection strength
-                               total_benefit = balance_benefit * (connection_count / len(neighbors))
-                               candidate_moves.append((total_benefit, node, i, j, node_priority, connection_count))
-      
-       if not candidate_moves:
-           break
-      
-       # Sort by benefit and try best moves
-       candidate_moves.sort(reverse=True)
-      
-       moved = False
-       for _, node, from_idx, to_idx, node_prio, connections in candidate_moves[:10]:
-           # Make sure move improves balance
-           if connections < 1:
-               continue
-          
-           if node not in partitions[from_idx]:
-               continue  # Already moved
-              
-           new_from_priority = priorities[from_idx] - node_prio
-           new_to_priority = priorities[to_idx] + node_prio
-          
-           # Check if move improves overall balance
-           old_imbalance = abs(priorities[from_idx] - mean_priority) + abs(priorities[to_idx] - mean_priority)
-           new_imbalance = abs(new_from_priority - mean_priority) + abs(new_to_priority - mean_priority)
-          
-           if new_imbalance < old_imbalance * 1.05:  # Allow slight increase for clustering
-               partitions[from_idx].remove(node)
-               partitions[to_idx].add(node)
-               priorities[from_idx] = new_from_priority
-               priorities[to_idx] = new_to_priority
-               moved = True
-               break
-      
-       if not moved:
-           break
-  
-   return partitions
-
-
-
-
-def merge_small_partitions(G, partitions, node_priorities, min_priority_threshold=0.5):
-   """
-   Merge partitions that are too small into their most connected neighbors.
-  
-   Args:
-       G: networkx graph
-       partitions: list of node sets
-       node_priorities: dict of node priorities
-       min_priority_threshold: minimum priority as fraction of mean
-  
-   Returns:
-       merged list of node sets
-   """
-   priorities = [calculate_partition_priority(G, p) for p in partitions]
-   mean_priority = np.mean(priorities)
-   threshold = mean_priority * min_priority_threshold
-  
-   partitions = [set(p) for p in partitions]
-  
-   changed = True
-   while changed:
-       changed = False
-       priorities = [calculate_partition_priority(G, p) for p in partitions]
-      
-       for i, partition in enumerate(partitions):
-           if len(partition) == 0:
-               continue
-              
-           if priorities[i] < threshold:
-               # Find most connected neighboring partition
-               best_neighbor = -1
-               best_connection_count = 0
-              
-               for j, other_partition in enumerate(partitions):
-                   if i == j or len(other_partition) == 0:
-                       continue
-                  
-                   # Count edges between partitions
-                   connection_count = 0
-                   for node in partition:
-                       for neighbor in G.neighbors(node):
-                           if neighbor in other_partition:
-                               connection_count += 1
-                  
-                   if connection_count > best_connection_count:
-                       best_connection_count = connection_count
-                       best_neighbor = j
-              
-               if best_neighbor >= 0:
-                   # Merge partition i into best_neighbor
-                   partitions[best_neighbor].update(partitions[i])
-                   partitions[i] = set()
-                   changed = True
-                   break
-  
-   # Remove empty partitions
-   return [p for p in partitions if len(p) > 0]
-
-
-
-
-def split_large_partitions(G, partitions, node_priorities, rng, target_count=8):
-   """
-   Split partitions that are too large to reach target count.
-  
-   Args:
-       G: networkx graph
-       partitions: list of node sets
-       node_priorities: dict of node priorities
-       rng: random generator
-       target_count: target number of partitions
-  
-   Returns:
-       list of node sets
-   """
-   while len(partitions) < target_count:
-       priorities = [calculate_partition_priority(G, p) for p in partitions]
-      
-       # Find largest partition by priority
-       max_idx = np.argmax(priorities)
-       largest_partition = partitions[max_idx]
-      
-       if len(largest_partition) <= 1:
-           break  # Can't split further
-      
-       # Split this partition
-       part1, part2 = spectral_partition_balanced(G, largest_partition, node_priorities, rng)
-      
-       # Replace the large partition with the two splits
-       partitions = partitions[:max_idx] + [part1, part2] + partitions[max_idx+1:]
-  
-   return partitions
-
-
-
-
-def create_partition_set(G, random_seed=0):
-   """
-   Create one set of 8 spatially-clustered, priority-balanced partitions.
-  
-   Args:
-       G: networkx graph
-       random_seed: random seed for reproducibility and diversity
-  
-   Returns:
-       list of 8 node sets
-   """
-   rng = np.random.default_rng(random_seed)
-  
-   # Compute node priorities
-   node_priorities = compute_node_priorities(G)
-  
-   all_nodes = set(G.nodes())
-  
-   # Create initial partition using spectral method with adaptive subdivision
-   print(f"  Initial partitioning...")
-   partitions = recursive_balanced_partition(G, all_nodes, node_priorities, 8, rng)
-  
-   # Remove any empty partitions
-   partitions = [p for p in partitions if len(p) > 0]
-   priorities = [calculate_partition_priority(G, p) for p in partitions]
-   print(f"  Created {len(partitions)} partitions with priorities: {[f'{p:.2f}' for p in priorities]}")
-  
-   # Merge very small partitions
-   print(f"  Merging small partitions...")
-   partitions = merge_small_partitions(G, partitions, node_priorities, min_priority_threshold=0.3)
-   priorities = [calculate_partition_priority(G, p) for p in partitions]
-   print(f"  After merging: {len(partitions)} partitions with priorities: {[f'{p:.2f}' for p in priorities]}")
-  
-   # Split large partitions if we have too few
-   if len(partitions) < 8:
-       print(f"  Splitting large partitions to reach 8...")
-       partitions = split_large_partitions(G, partitions, node_priorities, rng, target_count=8)
-       priorities = [calculate_partition_priority(G, p) for p in partitions]
-       print(f"  After splitting: {len(partitions)} partitions with priorities: {[f'{p:.2f}' for p in priorities]}")
-  
-   # Remove outliers aggressively
-   print(f"  Removing outliers...")
-   partitions = remove_outliers_from_partitions(G, partitions, node_priorities, max_iterations=30)
-  
-   priorities = [calculate_partition_priority(G, p) for p in partitions]
-   print(f"  After outlier removal, priorities: {[f'{p:.2f}' for p in priorities]}")
-  
-   # Refine for better balance while maintaining clustering
-   print(f"  Refining balance...")
-   partitions = refine_partition_balance(G, partitions, node_priorities, max_iterations=300)
-  
-   priorities = [calculate_partition_priority(G, p) for p in partitions]
-   print(f"  After refinement, priorities: {[f'{p:.2f}' for p in priorities]}")
-  
-   # Final check: if still very imbalanced, do one more merge-split cycle
-   mean_priority = np.mean(priorities)
-   if np.std(priorities) / mean_priority > 0.3:
-       print(f"  Still imbalanced, doing second merge-split cycle...")
-       partitions = merge_small_partitions(G, partitions, node_priorities, min_priority_threshold=0.4)
-       partitions = split_large_partitions(G, partitions, node_priorities, rng, target_count=8)
-       partitions = remove_outliers_from_partitions(G, partitions, node_priorities, max_iterations=20)
-       partitions = refine_partition_balance(G, partitions, node_priorities, max_iterations=200)
-       priorities = [calculate_partition_priority(G, p) for p in partitions]
-       print(f"  After second cycle, priorities: {[f'{p:.2f}' for p in priorities]}")
-  
-   return [set(p) for p in partitions]
-
-
+    return partitions
 
 
 def analyze_partitions(G, partitions):
-   """Analyze quality of partitions."""
-   stats = {
-       "num_partitions": len(partitions),
-       "partition_sizes": [],
-       "partition_priorities": [],
-       "partition_edges": [],
-       "partition_total_length": [],
-   }
-  
-   for partition in partitions:
-       subgraph = G.subgraph(partition)
-       priority = calculate_partition_priority(G, partition)
-       total_length = sum(
-           data.get("length_feet", 0) for u, v, data in subgraph.edges(data=True)
-       )
-      
-       stats["partition_sizes"].append(len(partition))
-       stats["partition_priorities"].append(priority)
-       stats["partition_edges"].append(subgraph.number_of_edges())
-       stats["partition_total_length"].append(total_length)
-  
-   return stats
+    """
+    analyze quality of partitions.
+
+    args:
+        G: networkx graph
+        partitions: list of node sets
+
+    returns:
+        dict with statistics
+    """
+    stats = {
+        "num_partitions": len(partitions),
+        "partition_sizes": [],
+        "partition_priorities": [],
+        "partition_edges": [],
+        "partition_total_length": [],
+        "partition_avg_travel_time": [],
+    }
+
+    for i, partition in enumerate(partitions):
+        subgraph = G.subgraph(partition)
+        priority = calculate_partition_priority(G, partition)
+        total_length = sum(
+            data["length_feet"] for u, v, data in subgraph.edges(data=True)
+        )
+        avg_travel_time = calculate_avg_pairwise_travel_time(G, partition)
+
+        stats["partition_sizes"].append(len(partition))
+        stats["partition_priorities"].append(priority)
+        stats["partition_edges"].append(subgraph.number_of_edges())
+        stats["partition_total_length"].append(total_length)
+        stats["partition_avg_travel_time"].append(avg_travel_time)
+
+    return stats
 
 
+def create_single_partition_set(args):
+    """
+    wrapper function for parallel partition set creation.
+
+    args:
+        args: tuple of (G, partition_id, alpha, seed_method, random_seed)
+
+    returns:
+        tuple of (partition_id, partitions, stats)
+    """
+    G, partition_id, alpha, seed_method, random_seed = args
+
+    print(
+        f"[INFO] worker {partition_id}: creating partition set with alpha={alpha}, seed_method={seed_method}"
+    )
+
+    partitions = create_partition_set(
+        G, random_seed=random_seed, alpha=alpha, seed_method=seed_method
+    )
+
+    stats = analyze_partitions(G, partitions)
+
+    print(f"[INFO] worker {partition_id}: completed")
+    print(
+        f"  priority balance (std/mean): {np.std(stats['partition_priorities'])/np.mean(stats['partition_priorities']):.3f}"
+    )
+    print(
+        f"  travel time balance (std/mean): {np.std(stats['partition_avg_travel_time'])/np.mean(stats['partition_avg_travel_time']):.3f}"
+    )
+
+    return partition_id, partitions, stats
 
 
 def main():
-   print("[INFO] Loading road graph...")
-   with open("road_graph.gpickle", "rb") as f:
-       G = pickle.load(f)
-   print(f"[INFO] Loaded graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
-  
-   # Create multiple partition sets
-   num_partition_sets = 3
-   partition_sets = []
-  
-   print(f"\n[INFO] Creating {num_partition_sets} partition sets...")
-  
-   for i in range(num_partition_sets):
-       print(f"\n[INFO] Creating partition set {i+1}/{num_partition_sets}...")
-       partitions = create_partition_set(G, random_seed=i)
-      
-       # Analyze quality
-       stats = analyze_partitions(G, partitions)
-      
-       print(f"  Partition sizes: {stats['partition_sizes']}")
-       print(f"  Partition priorities: {[f'{p:.2f}' for p in stats['partition_priorities']]}")
-       print(f"  Priority balance (std/mean): {np.std(stats['partition_priorities'])/np.mean(stats['partition_priorities']):.3f}")
-       print(f"  Priority range: {min(stats['partition_priorities']):.2f} - {max(stats['partition_priorities']):.2f}")
-      
-       partition_sets.append(partitions)
-  
-   # Save partitions
-   output_file = "partitions.json"
-   partition_sets_serializable = [
-       [[int(node) for node in p] for p in partition_set]
-       for partition_set in partition_sets
-   ]
-  
-   with open(output_file, "w") as f:
-       json.dump(partition_sets_serializable, f, indent=2)
-  
-   print(f"\n[INFO] Saved {num_partition_sets} partition sets to {output_file}")
-  
-   # Save detailed statistics
-   summary_rows = []
-   for i, partitions in enumerate(partition_sets):
-       stats = analyze_partitions(G, partitions)
-       for j in range(stats["num_partitions"]):
-           summary_rows.append({
-               "partition_set_id": i,
-               "partition_id": j,
-               "num_nodes": stats["partition_sizes"][j],
-               "total_priority": stats["partition_priorities"][j],
-               "num_edges": stats["partition_edges"][j],
-               "total_length_feet": stats["partition_total_length"][j],
-           })
-  
-   summary_df = pd.DataFrame(summary_rows)
-   summary_df.to_csv("partition_statistics.csv", index=False)
-   print(f"[INFO] Saved partition statistics to partition_statistics.csv")
-  
-   return partition_sets
+    print("[INFO] loading road graph...")
+    with open("road_graph.gpickle", "rb") as f:
+        G = pickle.load(f)
+    print(
+        f"[INFO] loaded graph with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges"
+    )
 
+    # hyperparameters for partitioning
+    num_partition_sets = 1  # number of different partition sets to try
+    alpha_values = [0.3, 0.5, 0.7]  # compactness weights to try
+    seed_methods = [
+        "priority_weighted",
+        "geographic",
+        "random",
+    ]  # seed selection methods
 
+    partition_sets = []
+
+    print(f"\n[INFO] creating {num_partition_sets} partition sets...")
+    print(f"[INFO] alpha values: {alpha_values}")
+    print(f"[INFO] seed methods: {seed_methods}")
+
+    # determine number of parallel workers (use cpu count, capped at num_partition_sets)
+    num_workers = min(mp.cpu_count(), num_partition_sets, 8)
+    print(f"[INFO] using {num_workers} parallel workers")
+
+    # prepare arguments for parallel execution
+    parallel_args = []
+    for i in range(num_partition_sets):
+        alpha = alpha_values[i % len(alpha_values)]
+        seed_method = seed_methods[i % len(seed_methods)]
+        parallel_args.append((G, i, alpha, seed_method, i))
+
+    # execute partition creation in parallel
+    print(f"\n[INFO] starting parallel partition generation...")
+    results = []
+
+    if num_partition_sets > 1 and num_workers > 1:
+        # use multiprocessing for multiple partition sets
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = {
+                executor.submit(create_single_partition_set, args): args[1]
+                for args in parallel_args
+            }
+
+            for future in as_completed(futures):
+                partition_id, partitions, stats = future.result()
+                results.append((partition_id, partitions, stats))
+    else:
+        # sequential execution for single partition set
+        for args in parallel_args:
+            partition_id, partitions, stats = create_single_partition_set(args)
+            results.append((partition_id, partitions, stats))
+
+    # sort results by partition_id to maintain order
+    results.sort(key=lambda x: x[0])
+
+    # extract partition sets and print summaries
+    print(f"\n[PASS] completed all partition sets")
+    for partition_id, partitions, stats in results:
+        print(f"\n[INFO] partition set {partition_id}:")
+        print(f"  partition sizes: {stats['partition_sizes']}")
+        print(
+            f"  partition priorities: {[f'{p:.2f}' for p in stats['partition_priorities']]}"
+        )
+        print(
+            f"  partition avg travel times: {[f'{t:.2f}' for t in stats['partition_avg_travel_time']]} minutes"
+        )
+        print(
+            f"  priority balance (std/mean): {np.std(stats['partition_priorities'])/np.mean(stats['partition_priorities']):.3f}"
+        )
+        print(
+            f"  travel time balance (std/mean): {np.std(stats['partition_avg_travel_time'])/np.mean(stats['partition_avg_travel_time']):.3f}"
+        )
+
+        partition_sets.append(partitions)
+
+    # save partitions
+    output_file = "partitions.json"
+
+    # convert node sets to lists for json serialization
+    partition_sets_serializable = []
+    for partition_set in partition_sets:
+        partition_sets_serializable.append(
+            [[int(node) for node in p] for p in partition_set]
+        )
+
+    with open(output_file, "w") as f:
+        json.dump(partition_sets_serializable, f, indent=2)
+
+    print(f"\n[INFO] saved {num_partition_sets} partition sets to {output_file}")
+
+    # save detailed statistics
+    all_stats = []
+    for i, partitions in enumerate(partition_sets):
+        stats = analyze_partitions(G, partitions)
+        stats["partition_set_id"] = i
+        all_stats.append(stats)
+
+    # create summary dataframe
+    import pandas as pd
+
+    summary_rows = []
+    for stats in all_stats:
+        for j in range(stats["num_partitions"]):
+            summary_rows.append(
+                {
+                    "partition_set_id": stats["partition_set_id"],
+                    "partition_id": j,
+                    "num_nodes": stats["partition_sizes"][j],
+                    "total_priority": stats["partition_priorities"][j],
+                    "num_edges": stats["partition_edges"][j],
+                    "total_length_feet": stats["partition_total_length"][j],
+                    "avg_travel_time_minutes": stats["partition_avg_travel_time"][j],
+                }
+            )
+
+    summary_df = pd.DataFrame(summary_rows)
+    summary_df.to_csv("partition_statistics.csv", index=False)
+    print(f"[INFO] saved partition statistics to partition_statistics.csv")
+
+    # print summary statistics
+    print(f"\n[SUMMARY] overall statistics:")
+    print(
+        f"  priority balance (std/mean): {summary_df.groupby('partition_set_id')['total_priority'].std().mean() / summary_df['total_priority'].mean():.3f}"
+    )
+    print(
+        f"  avg travel time range: {summary_df['avg_travel_time_minutes'].min():.2f} - {summary_df['avg_travel_time_minutes'].max():.2f} minutes"
+    )
+
+    return partition_sets
 
 
 if __name__ == "__main__":
-   main()
+    main()
 
+    # Graph Visualization
+    import networkx as nx
+    import matplotlib.pyplot as plt
+    import json
+    import pickle
+    import numpy as np
+    from matplotlib.patches import Polygon, Patch
+    from scipy.spatial import ConvexHull
 
-#--------- Graph Visualization --------
-import networkx as nx
-import matplotlib.pyplot as plt
-import json
-import pickle
-import numpy as np
-from matplotlib.patches import Polygon, Patch
-from scipy.spatial import ConvexHull
+    # Load the saved graph and partition data
+    with open("road_graph.gpickle", "rb") as f:
+        G = pickle.load(f)
 
+    with open("partitions.json", "r") as f:
+        partition_sets = json.load(f)
 
-# Load the saved graph and partition data
-with open("road_graph.gpickle", "rb") as f:
-   G = pickle.load(f)
+    # Pick the first partition set to visualize
+    partitions = partition_sets[0]
 
+    # Map node → partition index
+    node_to_partition = {}
+    for i, partition in enumerate(partitions):
+        for node in partition:
+            node_to_partition[node] = i
 
-with open("partitions.json", "r") as f:
-   partition_sets = json.load(f)
+    # Choose a color palette (adjust as needed)
+    num_partitions = len(partitions)
+    colors = plt.cm.get_cmap("tab10", num_partitions)
 
+    # Use node coordinates if available; otherwise, use a layout
+    if "x" in list(G.nodes(data=True))[0][1]:
+        pos = {n: (d["x"], d["y"]) for n, d in G.nodes(data=True)}
+    else:
+        pos = nx.spring_layout(G, seed=42)
 
-# Pick the first partition set to visualize
-partitions = partition_sets[0]
+    # Create figure and axis
+    plt.figure(figsize=(10, 10))
+    ax = plt.gca()
 
+    # 1️⃣ Draw faint gray edges (no arrows)
+    nx.draw_networkx_edges(
+        G, pos, edge_color="lightgray", alpha=0.6, width=0.8, arrows=False
+    )
 
-# Map node → partition index
-node_to_partition = {}
-for i, partition in enumerate(partitions):
-   for node in partition:
-       node_to_partition[node] = i
+    # 2️⃣ Draw rigid shaded polygons for each partition
+    legend_handles = []
+    for i, partition in enumerate(partitions):
+        color = np.array(colors(i))  # RGBA
+        points = np.array([pos[n] for n in partition if n in pos])
 
+        if len(points) >= 3:  # Need at least 3 points for a hull
+            try:
+                hull = ConvexHull(points)
+                polygon = Polygon(
+                    points[hull.vertices],
+                    closed=True,
+                    facecolor=color,
+                    alpha=0.15,  # Shading transparency
+                    edgecolor="none",
+                )
+                ax.add_patch(polygon)
 
-# Choose a color palette (adjust as needed)
-num_partitions = len(partitions)
-colors = plt.cm.get_cmap("tab10", num_partitions)
+                # Add this zone to the legend
+                legend_handles.append(
+                    Patch(facecolor=color, edgecolor=color, label=f"Zone {i + 1}")
+                )
 
+            except Exception as e:
+                print(f"Warning: Convex hull failed for zone {i + 1}: {e}")
 
-# Use node coordinates if available; otherwise, use a layout
-if "x" in list(G.nodes(data=True))[0][1]:
-   pos = {n: (d["x"], d["y"]) for n, d in G.nodes(data=True)}
-else:
-   pos = nx.spring_layout(G, seed=42)
+    # 3️⃣ Draw nodes (colored by partition)
+    nx.draw_networkx_nodes(
+        G,
+        pos,
+        node_color=[colors(node_to_partition[n]) for n in G.nodes()],
+        node_size=15,
+        alpha=0.9,
+    )
 
+    # 4️⃣ Add legend on the right side
+    ax.legend(
+        handles=legend_handles,
+        title="Zones",
+        loc="center left",
+        bbox_to_anchor=(1.05, 0.5),
+        frameon=False,
+    )
 
-# Create figure and axis
-plt.figure(figsize=(10, 10))
-ax = plt.gca()
-
-
-# 1️⃣ Draw faint gray edges (no arrows)
-nx.draw_networkx_edges(
-   G, pos, edge_color="lightgray", alpha=0.6, width=0.8, arrows=False
-)
-
-
-# 2️⃣ Draw rigid shaded polygons for each partition
-legend_handles = []
-for i, partition in enumerate(partitions):
-   color = np.array(colors(i))  # RGBA
-   points = np.array([pos[n] for n in partition if n in pos])
-
-
-   if len(points) >= 3:  # Need at least 3 points for a hull
-       try:
-           hull = ConvexHull(points)
-           polygon = Polygon(
-               points[hull.vertices],
-               closed=True,
-               facecolor=color,
-               alpha=0.15,  # Shading transparency
-               edgecolor="none",
-           )
-           ax.add_patch(polygon)
-
-
-           # Add this zone to the legend
-           legend_handles.append(
-               Patch(facecolor=color, edgecolor=color, label=f"Zone {i + 1}")
-           )
-
-
-       except Exception as e:
-           print(f"Warning: Convex hull failed for zone {i + 1}: {e}")
-
-
-# 3️⃣ Draw nodes (colored by partition)
-nx.draw_networkx_nodes(
-   G,
-   pos,
-   node_color=[colors(node_to_partition[n]) for n in G.nodes()],
-   node_size=15,
-   alpha=0.9,
-)
-
-
-# 4️⃣ Add legend on the right side
-ax.legend(
-   handles=legend_handles,
-   title="Zones",
-   loc="center left",
-   bbox_to_anchor=(1.05, 0.5),
-   frameon=False,
-)
-
-
-# 5️⃣ Styling and output
-plt.title("Graph Partitioning of Ithaca into 8 Zones", fontsize=14)
-plt.axis("off")
-plt.tight_layout()
-plt.savefig(
-   "partition_visualization_shaded_with_legend.png",
-   dpi=300,
-   bbox_inches="tight"
-)
-plt.show()
-
-
-
+    # 5️⃣ Styling and output
+    plt.title("Graph Partitioning of Ithaca into 8 Zones", fontsize=14)
+    plt.axis("off")
+    plt.tight_layout()
+    plt.savefig(
+        "partition_visualization_shaded_with_legend.png", dpi=300, bbox_inches="tight"
+    )
+    plt.show()
