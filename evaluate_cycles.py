@@ -9,6 +9,7 @@ import numpy as np
 import json
 import pickle
 import pandas as pd
+import csv
 
 
 # default parameters
@@ -258,6 +259,45 @@ def rank_cycles_by_partition(evaluated_cycles):
 
     return partitions
 
+def load_road_names():
+    """Load road names from CSV and create lookup by edge attributes."""
+    print("[INFO] loading road names from roads_with_priority.csv...")
+    roads_df = pd.read_csv("roads_with_priority.csv")
+    
+    # Create multiple lookup strategies
+    road_lookup = {}
+    
+    for _, row in roads_df.iterrows():
+        name = row['NAME'] if pd.notna(row['NAME']) and str(row['NAME']).strip() else None
+        if not name:
+            continue
+            
+        # Create lookup key using multiple attributes for uniqueness
+        priority = round(float(row['priority']), 6)
+        length = round(float(row['length_feet']), 2)
+        travel_time = round(float(row['travel_time_minutes']), 6)
+        
+        # Use combination of attributes as key
+        key = (priority, length, travel_time)
+        if key not in road_lookup:
+            road_lookup[key] = name
+    
+    return road_lookup
+
+def get_road_name(edge_data, road_lookup):
+    """Get road name for an edge."""
+    priority = round(float(edge_data.get('priority', 0)), 6)
+    length = round(float(edge_data.get('length_feet', 0)), 2)
+    travel_time = round(float(edge_data.get('travel_time', 0)), 6)
+    
+    key = (priority, length, travel_time)
+    name = road_lookup.get(key)
+    
+    if name:
+        return name
+    else:
+        return f"Road {priority:.2f}"
+
 
 def main():
     print("[INFO] loading road graph...")
@@ -343,6 +383,90 @@ def main():
             f"coverage = {top_cycle['evaluation']['coverage_ratio']:.1%}, "
             f"method = {top_cycle['method']}"
         )
+
+    print("\n[INFO] exporting top (optimal) cycles per partition...")
+
+    # Load road names
+    road_lookup = load_road_names()
+    print(f"[INFO] loaded {len(road_lookup)} road names from CSV")
+
+    optimal_cycles = []
+    readable_path = "optimal_cycles_readable.txt"
+    detailed_path = "optimal_cycles_detailed.txt"
+
+    with open(readable_path, "w") as f_summary, open(detailed_path, "w") as f_detail:
+        f_summary.write("=" * 80 + "\n")
+        f_summary.write("OPTIMAL SNOW PLOW ROUTES - SUMMARY\n")
+        f_summary.write("=" * 80 + "\n\n")
+        
+        f_detail.write("=" * 80 + "\n")
+        f_detail.write("OPTIMAL SNOW PLOW ROUTES - DRIVER INSTRUCTIONS\n")
+        f_detail.write("=" * 80 + "\n\n")
+        
+        for key, cycle_list in sorted(ranked_partitions.items()):
+            ps_id, p_id = key
+            top_cycle_entry = cycle_list[0]
+            eval_data = top_cycle_entry["evaluation"]
+            metrics = top_cycle_entry["metrics"]
+            cycle = top_cycle_entry["cycle"]
+
+            optimal_cycles.append({
+                "partition_set_id": ps_id,
+                "partition_id": p_id,
+                "method": top_cycle_entry["method"],
+                "start_node": top_cycle_entry["start_node"],
+                "cycle_time": eval_data["cycle_time"],
+                "num_complete_cycles": eval_data["num_complete_cycles"],
+                "benefit": eval_data["benefit"],
+                "benefit_per_minute": eval_data["benefit_per_minute"],
+                "benefit_pct": eval_data["benefit_pct"],
+                "cost_without_plow": eval_data["cost_without_plow"],
+                "cost_with_plow": eval_data["cost_with_plow"],
+                "coverage_ratio": eval_data["coverage_ratio"],
+                "total_priority": metrics["total_priority"],
+                "unique_edges": metrics["unique_edges"],
+            })
+
+            # Write summary
+            f_summary.write(f"ZONE {p_id + 1} (Driver {p_id + 1})\n")
+            f_summary.write(f"{'-' * 40}\n")
+            f_summary.write(f"Starting Node: {top_cycle_entry['start_node']}\n")
+            f_summary.write(f"Cycle Time: {eval_data['cycle_time']:.1f} min ({eval_data['cycle_time']/60:.1f} hrs)\n")
+            f_summary.write(f"Cycles in 12h Storm: {eval_data['num_complete_cycles']}\n")
+            f_summary.write(f"Efficiency: {eval_data['benefit_pct']:.2f}%\n")
+            f_summary.write(f"Unique Roads: {metrics['unique_edges']}\n\n")
+
+            # Write detailed instructions
+            f_detail.write("=" * 80 + "\n")
+            f_detail.write(f"DRIVER {p_id + 1} - ZONE {p_id + 1}\n")
+            f_detail.write("=" * 80 + "\n")
+            f_detail.write(f"Start at Node {top_cycle_entry['start_node']}\n")
+            f_detail.write(f"Cycle Time: {eval_data['cycle_time']:.1f} min | Repeat {eval_data['num_complete_cycles']}x during storm\n")
+            f_detail.write(f"Roads: {metrics['unique_edges']} | Steps: {len(cycle)}\n")
+            f_detail.write("-" * 80 + "\n\n")
+            
+            cumulative_time = 0.0
+            for step_num, (u, v, k) in enumerate(cycle, 1):
+                if G.has_edge(u, v, k):
+                    edge_data = G[u][v][k]
+                    name = get_road_name(edge_data, road_lookup)
+                    
+                    travel_time = edge_data.get("travel_time", 0)
+                    length_feet = edge_data.get("length_feet", 0)
+                    cumulative_time += travel_time
+                    
+                    f_detail.write(f"{step_num}. {name} ({length_feet:.0f}ft, {travel_time:.1f}min) [{u}→{v}]\n")
+                else:
+                    f_detail.write(f"{step_num}. [ERROR: Missing edge {u}→{v}]\n")
+            
+            f_detail.write(f"\nTotal: {cumulative_time:.1f} minutes\n")
+            f_detail.write("\n")
+
+    # Save CSV
+    pd.DataFrame(optimal_cycles).to_csv("optimal_cycles.csv", index=False)
+    print("[INFO] saved optimal_cycles.csv")
+    print(f"[INFO] saved {readable_path}")
+    print(f"[INFO] saved {detailed_path}")
 
     return evaluated_cycles
 
